@@ -111,15 +111,14 @@ async function extractResources(epubPath, outputPath) {
 }
 
 // Function to adjust image paths in HTML content dynamically
-function adjustImagePaths(html, resourcesPath) {
+function adjustImagePaths(html, baseDir) {
   const $ = cheerio.load(html);
 
   $('img').each(function () {
     const src = $(this).attr('src');
     if (src) {
-      const resolvedPath = path.resolve(resourcesPath, src);
-      const relativePath = path.relative(resourcesPath, resolvedPath).replace(/\\/g, '/');
-      console.log(`Adjusting image path from ${src} to ${relativePath}`); // Debugging statement
+      const resolvedPath = path.resolve(baseDir, src);
+      const relativePath = path.relative(baseDir, resolvedPath).replace(/\\/g, '/');
       $(this).attr('src', relativePath);
     }
   });
@@ -282,6 +281,8 @@ app.post('/test-parse', async (req, res) => {
         sections.forEach(section => {
           section.data = adjustImagePaths(section.data, resourcesDir);
         });
+
+        console.log('EPub sections:', sections); // Debugging statement
 
         res.json({ success: true, sections });
       } catch (err) {
