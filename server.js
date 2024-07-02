@@ -5,6 +5,7 @@ const fs = require('fs-extra');
 const EpubGen = require('epub-gen');
 const cheerio = require('cheerio');
 const EPub = require('epub');
+const AdmZip = require('adm-zip');
 
 const app = express();
 const PORT = 3000;
@@ -48,8 +49,8 @@ function processTextNodes($, element, dictionary) {
       });
 
       $(this).replaceWith(processedText);
-    } else if (this.type === 'tag') {
-      processTextNodes($, this, dictionary); // Recursively process child nodes
+    } else if (this.type === 'tag' && this.tagName !== 'img') {
+      processTextNodes($, this, dictionary); // Recursively process child nodes, skip images
     }
   });
 }
@@ -58,7 +59,9 @@ function processTextNodes($, element, dictionary) {
 function processContent(html, dictionary) {
   const $ = cheerio.load(html);
 
-  processTextNodes($, $('body'), dictionary);
+  $('p, span, div').each(function () {
+    processTextNodes($, this, dictionary);
+  });
 
   return $.html();
 }
@@ -88,10 +91,37 @@ async function getAndProcessChapters(epub, dictionary) {
   return sections;
 }
 
+// Function to extract resources from the EPUB file
+async function extractResources(epubPath, outputPath) {
+  const zip = new AdmZip(epubPath);
+  zip.extractAllTo(outputPath, true);
+}
+
+// Function to adjust image paths in HTML content
+function adjustImagePaths(html, resourcesPath) {
+  const $ = cheerio.load(html);
+  $('img').each(function () {
+    const src = $(this).attr('src');
+    if (src) {
+      const newSrc = path.join(resourcesPath, src);
+      $(this).attr('src', newSrc);
+    }
+  });
+  return $.html();
+}
+
 // Function to handle errors while generating EPUB
-async function generateEpub(options, processedPath) {
+async function generateEpub(options, processedPath, resourcesPath) {
   try {
-    await new EpubGen(options, processedPath).promise;
+    // Copy resources to the new EPUB
+    const zip = new AdmZip();
+    zip.addLocalFolder(resourcesPath, 'OEBPS');
+    const tempEpubPath = path.join(__dirname, 'temp.epub');
+    zip.writeZip(tempEpubPath);
+
+    const epubOptions = Object.assign({}, options, { tempDir: path.join(__dirname, 'node_modules', 'epub-gen', 'tempDir') });
+    await new EpubGen(epubOptions, processedPath).promise;
+    fs.removeSync(tempEpubPath); // Clean up temporary EPUB file
     return { success: true, downloadUrl: `/processed/${path.basename(processedPath)}` };
   } catch (err) {
     console.error('Error generating EPUB:', err);
@@ -108,14 +138,19 @@ app.post('/upload', async (req, res) => {
   const epubFile = req.files.epubFile;
   const uploadPath = path.join(__dirname, 'uploads', epubFile.name);
   const processedPath = path.join(__dirname, 'processed', `processed-${epubFile.name}`);
+  const resourcesPath = path.join(__dirname, 'uploads', 'resources');
 
   try {
     // Remove existing files if they exist
     await fs.remove(uploadPath);
     await fs.remove(processedPath);
+    await fs.remove(resourcesPath);
 
     // Save the uploaded file
     await epubFile.mv(uploadPath);
+
+    // Extract resources from the original EPUB
+    await extractResources(uploadPath, resourcesPath);
 
     // Load the dictionary
     const dictionary = await loadDictionary(dictionaryFilePath);
@@ -127,13 +162,18 @@ app.post('/upload', async (req, res) => {
       try {
         const sections = await getAndProcessChapters(epub, dictionary);
 
+        // Adjust image paths in each section
+        sections.forEach(section => {
+          section.data = adjustImagePaths(section.data, 'OEBPS');
+        });
+
         const options = {
           title: epub.metadata.title || 'Untitled',
           author: epub.metadata.creator || 'Unknown',
           content: sections,
         };
 
-        const result = await generateEpub(options, processedPath);
+        const result = await generateEpub(options, processedPath, resourcesPath);
 
         if (result.success) {
           res.json({ success: true, downloadUrl: result.downloadUrl });
