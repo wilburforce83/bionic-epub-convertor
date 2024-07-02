@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPUB Processor</title>
+</head>
+<body>
+    <h1>Upload EPUB File</h1>
+    <form id="uploadForm" enctype="multipart/form-data">
+        <input type="file" id="epubFile" name="epubFile" accept=".epub" required>
+        <button type="submit">Upload</button>
+    </form>
+    <div id="message"></div>
+    <h2>Test EPUB Parse</h2>
+    <form id="testParseForm" enctype="multipart/form-data">
+        <input type="file" id="testEpubFile" name="epubFile" accept=".epub" required>
+        <button type="submit">Test Parse</button>
+    </form>
+    <div id="testMessage"></div>
+    <h2>Test EPUB Process</h2>
+    <form id="testProcessForm" enctype="multipart/form-data">
+        <input type="file" id="testProcessFile" name="epubFile" accept=".epub" required>
+        <button type="submit">Test Process</button>
+    </form>
+    <div id="testProcessMessage"></div>
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const fileInput = document.getElementById('epubFile');
+            const formData = new FormData();
+            formData.append('epubFile', fileInput.files[0]);
+
+            document.getElementById('message').innerText = 'Processing...';
+
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                document.getElementById('message').innerHTML = `Processed successfully. <a href="${result.downloadUrl}" download>Download Processed EPUB</a>`;
+            } else {
+                document.getElementById('message').innerText = 'Error processing file.';
+            }
+        });
+
+        document.getElementById('testParseForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const fileInput = document.getElementById('testEpubFile');
+            const formData = new FormData();
+            formData.append('epubFile', fileInput.files[0]);
+
+            document.getElementById('testMessage').innerText = 'Parsing...';
+
+            const response = await fetch('/test-parse', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                document.getElementById('testMessage').innerText = JSON.stringify(result.sections, null, 2);
+            } else {
+                document.getElementById('testMessage').innerText = 'Error parsing file.';
+            }
+        });
+
+        document.getElementById('testProcessForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const fileInput = document.getElementById('testProcessFile');
+            const formData = new FormData();
+            formData.append('epubFile', fileInput.files[0]);
+
+            document.getElementById('testProcessMessage').innerText = 'Processing...';
+
+            const response = await fetch('/test-process', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                document.getElementById('testProcessMessage').innerText = JSON.stringify(result.sections, null, 2);
+            } else {
+                document.getElementById('testProcessMessage').innerText = 'Error processing file.';
+            }
+        });
+    </script>
+</body>
+</html>
