@@ -110,17 +110,20 @@ async function extractResources(epubPath, outputPath) {
   zip.extractAllTo(outputPath, true);
 }
 
-// Function to adjust image paths in HTML content
+// Function to adjust image paths in HTML content dynamically
 function adjustImagePaths(html, resourcesPath) {
   const $ = cheerio.load(html);
+
   $('img').each(function () {
     const src = $(this).attr('src');
     if (src) {
-      const newSrc = path.join(resourcesPath, path.basename(src)).replace(/\\/g, '/');
-      console.log(`Adjusting image path from ${src} to ${newSrc}`); // Debugging statement
-      $(this).attr('src', newSrc);
+      const resolvedPath = path.resolve(resourcesPath, src);
+      const relativePath = path.relative(resourcesPath, resolvedPath).replace(/\\/g, '/');
+      console.log(`Adjusting image path from ${src} to ${relativePath}`); // Debugging statement
+      $(this).attr('src', relativePath);
     }
   });
+
   return $.html();
 }
 
@@ -149,7 +152,7 @@ async function generateEpub(options, processedPath, resourcesPath) {
 
     // Copy resources to the new EPUB
     const zip = new AdmZip();
-    zip.addLocalFolder(resourcesPath, 'OEBPS/images');
+    zip.addLocalFolder(resourcesPath, 'OEBPS');
     const tempEpubPath = path.join(rootDir, 'temp', 'temp.epub');
     zip.writeZip(tempEpubPath);
 
@@ -212,7 +215,7 @@ app.post('/upload', async (req, res) => {
 
         // Adjust image paths in each section
         sections.forEach(section => {
-          section.data = adjustImagePaths(section.data, 'OEBPS/images');
+          section.data = adjustImagePaths(section.data, resourcesDir);
         });
 
         const options = {
@@ -262,6 +265,12 @@ app.post('/test-parse', async (req, res) => {
     // Save the uploaded file
     await epubFile.mv(uploadPath);
 
+    // Extract resources from the original EPUB
+    await extractResources(uploadPath, resourcesDir);
+
+    // Load the dictionary
+    const dictionary = await loadDictionary(dictionaryFilePath);
+
     // Initialize the EPUB parser
     const epub = new EPub(uploadPath);
 
@@ -271,7 +280,7 @@ app.post('/test-parse', async (req, res) => {
 
         // Adjust image paths in each section
         sections.forEach(section => {
-          section.data = adjustImagePaths(section.data, 'OEBPS/images');
+          section.data = adjustImagePaths(section.data, resourcesDir);
         });
 
         res.json({ success: true, sections });
@@ -288,12 +297,7 @@ app.post('/test-parse', async (req, res) => {
   }
 });
 
-// Route to handle any other requests
-app.get('*', (req, res) => {
-  res.status(404).send('Page not found');
-});
-
-app.listen(PORT, async () => {
-  await ensureDirectoriesExist();
+// Start the server
+app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
