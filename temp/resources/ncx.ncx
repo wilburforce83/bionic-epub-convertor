@@ -1,0 +1,34 @@
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
+  <head>
+    <meta name="dtb:uid" content="51c427ea-3e37-4389-852b-4859b9de79c0"/>
+    <meta content="1" name="dtb:depth"/>
+    <meta content="0" name="dtb:totalPageCount"/>
+    <meta content="0" name="dtb:maxPageNumber"/>
+  </head>
+  <docTitle>
+    <text>Escaping the Rainbow - Complete (Escaping the Rainbow Short Stories)</text>
+  </docTitle>
+  <docAuthor>
+    <text>Leslie E Heath</text>
+  </docAuthor>
+  <navMap>
+    <navPoint id="title-page" playOrder="1">
+      <navLabel>
+        <text>Title Page</text>
+      </navLabel>
+      <content src="title-page.xhtml"/>
+    </navPoint>
+    <navPoint id="copyright-page" playOrder="2">
+      <navLabel>
+        <text>Copyright Page</text>
+      </navLabel>
+      <content src="copyright-page.xhtml"/>
+    </navPoint>
+    <navPoint id="c001" playOrder="3">
+      <navLabel>
+        <text>Escaping the Rainbow</text>
+      </navLabel>
+      <content src="c001.xhtml"/>
+    </navPoint>
+  </navMap>
+</ncx>

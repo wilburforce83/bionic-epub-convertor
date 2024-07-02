@@ -1,0 +1,128 @@
+
+    h1.chapter-title {
+        margin-top: 0.5em;
+    }
+    
+    img.chapter-title-decoration-above {
+    
+        width: 0.3800in;
+    
+    
+        height: 0.4767in;
+    
+    
+    }
+    div.chapter-title-decoration-above {
+        text-align: center;
+    }
+    div.chapter-title-decoration-above-inner {
+        margin: 0;
+        padding: 0;
+        display: inline-block;
+    
+        width: 0.3800in;
+    
+    
+        height: 0.4767in;
+    
+    }
+    
+
+
+
+    div.chapter-title-decoration-below {
+        display: none;
+    }
+
+
+
+    .section-break, p.section-break-symbol {
+        display: none;
+    }
+    
+    img.decoration-scene-break {
+
+        width: 1.7500in;
+
+
+        height: 0.3633in;
+
+
+    }
+    div.decoration-scene-break {
+        text-align: center;
+    }
+    div.decoration-scene-break-inner {
+        margin: 0;
+        padding: 0;
+        display: inline-block;
+
+        width: 1.7500in;
+
+
+        height: 0.3633in;
+
+    }
+
+
+
+
+    div.chapter-title-corner-decoration-left-column {
+        display: none;
+    }
+
+
+
+    div.chapter-title-corner-decoration-right-column {
+        display: none;
+    }
+
+
+
+    .chapter-title-corner-decorations {
+        display: none;
+    }
+
+
+
+
+    span.first-in-chapter {
+        float: left;
+        font-size: 370%;
+        line-height: 120%;
+        font-weight: normal;
+        font-style: normal;
+        text-decoration: none !important;
+        text-transform: uppercase;
+        margin-top: -0.255em;
+        margin-right: 0.05em;
+        margin-bottom: -0.43em;
+        padding-top: 0.04em;
+        padding-right: 0;
+        padding-left: 0.03em;
+    }
+    p.first-in-chapter sup {
+        vertical-align: 0.3em;
+    }
+    
+    
+        /* Generic download epub */
+        span.first-in-chapter {
+            position: relative;
+            top: 0.12em;
+            font-size: 3.32em;
+        }
+    
+    
+    
+
+
+
+
+
+
+
+    span.first-scene-phrase {
+        text-transform: uppercase;
+    }
+

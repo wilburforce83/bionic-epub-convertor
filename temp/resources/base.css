@@ -1,0 +1,350 @@
+div.front-matter,div.end-matter {
+  text-align: center;
+}
+
+div.front-matter,div.end-matter p {
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+div.page-break {
+  text-align: center;
+  visibility: hidden;
+  page-break-after: always;
+}
+
+p {
+  font-size: 1em;
+  text-indent: 1.5em;
+  widows: 2;
+  orphans: 2;
+  margin-bottom: 0em;
+  margin-top: 0em;
+}
+
+blockquote {
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+blockquote p {
+  text-indent: 0
+}
+
+div.blockquote {
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+p.blockquote {
+  text-indent: 0;
+  margin-left: 2em;
+  margin-right: 2em;
+  margin-bottom: 1em;
+}
+
+div.poetry {
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+p.poetry {
+  text-indent: 0;
+  margin-left: 2em;
+  margin-right: 2em;
+  margin-bottom: 0em;
+}
+
+h1 {
+  font-size: 1.6em;
+  font-weight: bold;
+  text-align: center;
+  margin-top: .5em;
+  margin-bottom: .5em;
+}
+
+h2 {
+  font-size: 1.4em;
+  font-weight: bold;
+  text-align: center;
+  margin-top: 1em;
+  margin-bottom: .5em;
+}
+
+h3 {
+  font-size: 1.2em;
+  font-weight: bold;
+  text-align: left;
+  margin-top: 1em;
+  margin-bottom: .5em;
+}
+
+.section-break {
+  text-indent: 0;
+  text-align: center;
+  visibility: hidden;
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+}
+
+.section-break-symbol {
+  text-indent: 0;
+  text-align: center;
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+.caps {
+  font-variant: small-caps !important;
+}
+
+h1.chapter-title {
+  margin-top: 0.5em;
+}
+
+p.first-in-chapter {
+  text-indent: 0;
+}
+
+p.first-in-scene {
+  text-indent: 0;
+}
+
+p.outline1 {
+  margin-top: 0;
+  margin-right: 0;
+  margin-bottom: 0;
+  margin-left: 0;
+}
+
+p.outline2 {
+  margin-top: 0;
+  margin-right: 0;
+  margin-bottom: 0;
+  margin-left: 1em;
+}
+
+p.outline3 {
+  margin-top: 0;
+  margin-right: 0;
+  margin-bottom: 0;
+  margin-left: 2em;
+}
+
+p.outline4 {
+  margin-top: 0;
+  margin-right: 0;
+  margin-bottom: 0;
+  margin-left: 3em;
+}
+
+div.inset {
+  margin-top: 1em;
+  margin-right: 1em;
+  margin-bottom: 1em;
+  margin-left: 1em;
+  padding: 0.5em;
+  border: 1px solid black;
+  background-color: #dedede;
+}
+
+div.inset p {
+  text-indent: 0;
+  margin-bottom: 1em;
+}
+
+div.inset h5 {
+  text-align: center;
+  margin: 0.25em 0;
+}
+
+p.line-before {
+  margin-top: 12pt;
+}
+
+p.line-after {
+  margin-bottom: 12pt;
+}
+
+/* End Matter css */
+/* Cover Page */
+#cover-page p {
+	text-indent: 0;
+	text-align: center;
+}
+#cover-page .cover-page-title p {
+	font-size: 1.8rem;
+	margin-top: 3em;
+	margin-bottom: 1em;
+}
+.cover-page-series {
+	font-size: large;
+	margin-bottom: 1em;
+}
+#cover-page .cover-page-author p {
+	font-size: 1.2rem;
+	margin-bottom: 3em;
+}
+.cover-page-publisher {
+	font-size: small;
+}
+
+/* Copyright Page */
+#copyright-page p {
+	text-indent: 0;
+	text-align: left;
+	margin-bottom: 0.5em;
+}
+.copyright-page-disclaimer {
+}
+.copyright-page-title {
+}
+.copyright-page-edition {
+}
+.copyright-page-isbn {
+}
+.copyright-page-contributors {
+}
+.copyright-page-printing {
+	display: none;
+}
+
+/* Also By */
+#also-by-page p {
+	text-indent: 0;
+	text-align: center;
+	margin: 0;
+}
+.also-by-page-author {
+	font-size: x-large;
+	margin-top: 2em;
+	margin-bottom: 2em;
+}
+#also-by-page .also-by-page-author p {
+	font-size: 1.6rem;
+}
+.also-by-page-series {
+	margin-bottom: 1em;
+}
+.also-by-page-series-title {
+  font-weight: bold;
+}
+.also-by-page-book-title {
+}
+.also-by-page-author-link {
+}
+
+/* Dedication Page */
+#dedication-page div {
+}
+
+#dedication-page h1 {
+}
+
+#dedication-body-short p {
+    text-indent: 0;
+    text-align: center;
+	margin-bottom: 1.5em;
+    margin-right: 1.5em;
+    margin-left: 1.5em;
+}
+
+
+
+/* Teaser Page */
+#teaser-page p {
+	text-indent: 1.5em;
+	text-align: justify;
+	margin: 0;
+}
+.teaser-page-intro {
+	margin-top: 2em;
+	margin-bottom: 2em;
+}
+p#teaser-page-promo-text {
+	text-indent: 0;
+	text-align: center;
+}
+.teaser-page-cover-image {
+	text-indent: 0;
+	text-align: center;
+	margin-bottom: 2em;
+}
+#teaser-page .teaser-page-description p:first-of-type {
+	text-indent: 0;
+}
+.teaser-page-author-link {
+}
+
+/* About the Author */
+#about-the-author-page p {
+	text-indent: 1.5em;
+	text-align: justify;
+	margin: 0;
+}
+.about-the-author-page-author-photo {
+	text-indent: 0;
+	text-align: center;
+}
+.about-the-author-page-author-link {
+}
+#about-the-author-page .user-content p:first-of-type {
+    text-indent: 0;
+}
+
+
+/* About the Publisher */
+#about-the-publisher-page p {
+	text-indent: 1.5em;
+	text-align: justify;
+	margin: 0;
+}
+
+.about-the-publisher-page-publisher-photo {
+	text-indent: 0;
+    text-align: center;
+}
+
+#about-the-publisher-page .user-content p:first-of-type {
+    text-indent: 0;
+}
+
+.about-the-publisher-page-publisher-link {
+}
+
+/* New Release */
+.new-release-sign-up-page {
+    text-align: center;
+}
+
+.new-release-sign-up-page p {
+    text-align: center;
+    text-indent: 0em;
+    margin-bottom: 1em;
+    margin-top: auto;
+}
+
+/* Chapter Title Image Templating Support */
+div.chapter-title {
+    margin-bottom: 1em;
+}
+div.chapter-title-decoration-above {
+    text-align: center;
+}
+
+div.chapter-title-decoration-below {
+    text-align: center;
+}
+
+td.chapter-title-corner-decoration-right-column {
+    text-align: right;
+}
+
+td.chapter-title-corner-decoration-middle-column {
+    width: 60%;
+}
+
+div.decoration-scene-break {
+    margin: 0.75em 0;
+    text-align: center;
+}

@@ -11,11 +11,24 @@ const app = express();
 const PORT = 3000;
 
 const dictionaryFilePath = path.join(__dirname, 'dictionary.txt');
+const rootDir = __dirname;
+const uploadsDir = path.join(rootDir, 'uploads');
+const processedDir = path.join(rootDir, 'processed');
+const tempDir = path.join(rootDir, 'temp');
+const resourcesDir = path.join(tempDir, 'resources');
 
 // Middleware to handle file uploads
 app.use(fileUpload());
-app.use(express.static(path.join(__dirname, 'public')));
-app.use('/processed', express.static(path.join(__dirname, 'processed')));
+app.use(express.static(path.join(rootDir, 'public')));
+app.use('/processed', express.static(processedDir));
+
+// Ensure directories exist
+async function ensureDirectoriesExist() {
+  await fs.ensureDir(uploadsDir);
+  await fs.ensureDir(processedDir);
+  await fs.ensureDir(tempDir);
+  await fs.ensureDir(resourcesDir);
+}
 
 // Function to load the dictionary file into a Set for quick lookup
 async function loadDictionary(filePath) {
@@ -103,29 +116,64 @@ function adjustImagePaths(html, resourcesPath) {
   $('img').each(function () {
     const src = $(this).attr('src');
     if (src) {
-      const newSrc = path.join(resourcesPath, src).replace(/\\/g, '/');
+      const newSrc = path.join(resourcesPath, path.basename(src)).replace(/\\/g, '/');
+      console.log(`Adjusting image path from ${src} to ${newSrc}`); // Debugging statement
       $(this).attr('src', newSrc);
     }
   });
   return $.html();
 }
 
+// Function to ensure all options are defined with default values
+function ensureEpubOptions(options) {
+  const defaultOptions = {
+    title: 'Untitled',
+    author: 'Unknown',
+    content: [],
+    output: null,
+    version: 3,
+    lang: 'en',
+    tocTitle: 'Table of Contents',
+    appendChapterTitles: true,
+    tempDir: path.join(rootDir, 'temp', 'tempDir'),
+  };
+
+  return { ...defaultOptions, ...options };
+}
+
 // Function to handle errors while generating EPUB
 async function generateEpub(options, processedPath, resourcesPath) {
   try {
+    // Ensure options are defined
+    const epubOptions = ensureEpubOptions(options);
+
     // Copy resources to the new EPUB
     const zip = new AdmZip();
-    zip.addLocalFolder(resourcesPath, 'OEBPS');
-    const tempEpubPath = path.join(__dirname, 'temp.epub');
+    zip.addLocalFolder(resourcesPath, 'OEBPS/images');
+    const tempEpubPath = path.join(rootDir, 'temp', 'temp.epub');
     zip.writeZip(tempEpubPath);
 
-    const epubOptions = Object.assign({}, options, { tempDir: path.join(__dirname, 'node_modules', 'epub-gen', 'tempDir') });
+    epubOptions.tempDir = path.join(rootDir, 'temp', 'tempDir');
+
+    console.log('EPub options:', epubOptions); // Debugging statement
+    console.log('EPub content titles:', epubOptions.content.map(c => c.title)); // Debugging titles
+    console.log('EPub content data first 100 chars:', epubOptions.content.map(c => (typeof c.data === 'string' ? c.data.substring(0, 100) : 'Invalid content data'))); // Debugging data
+
     await new EpubGen(epubOptions, processedPath).promise;
     fs.removeSync(tempEpubPath); // Clean up temporary EPUB file
     return { success: true, downloadUrl: `/processed/${path.basename(processedPath)}` };
   } catch (err) {
     console.error('Error generating EPUB:', err);
     return { success: false, message: 'Error generating EPUB file.' };
+  }
+}
+
+// Function to clear temp folder
+async function clearTempFolder() {
+  try {
+    await fs.emptyDir(tempDir);
+  } catch (err) {
+    console.error('Error clearing temp folder:', err);
   }
 }
 
@@ -136,21 +184,21 @@ app.post('/upload', async (req, res) => {
   }
 
   const epubFile = req.files.epubFile;
-  const uploadPath = path.join(__dirname, 'uploads', epubFile.name);
-  const processedPath = path.join(__dirname, 'processed', `processed-${epubFile.name}`);
-  const resourcesPath = path.join(__dirname, 'uploads', 'resources');
+  const uploadPath = path.join(uploadsDir, epubFile.name);
+  const processedPath = path.join(processedDir, `processed-${epubFile.name}`);
 
   try {
-    // Remove existing files if they exist
-    await fs.remove(uploadPath);
-    await fs.remove(processedPath);
-    await fs.remove(resourcesPath);
+    // Clear temp folder
+    await clearTempFolder();
+
+    // Ensure directories exist
+    await ensureDirectoriesExist();
 
     // Save the uploaded file
     await epubFile.mv(uploadPath);
 
     // Extract resources from the original EPUB
-    await extractResources(uploadPath, resourcesPath);
+    await extractResources(uploadPath, resourcesDir);
 
     // Load the dictionary
     const dictionary = await loadDictionary(dictionaryFilePath);
@@ -164,7 +212,7 @@ app.post('/upload', async (req, res) => {
 
         // Adjust image paths in each section
         sections.forEach(section => {
-          section.data = adjustImagePaths(section.data, 'OEBPS');
+          section.data = adjustImagePaths(section.data, 'OEBPS/images');
         });
 
         const options = {
@@ -173,7 +221,9 @@ app.post('/upload', async (req, res) => {
           content: sections,
         };
 
-        const result = await generateEpub(options, processedPath, resourcesPath);
+        console.log('EPub sections:', sections); // Debugging statement
+
+        const result = await generateEpub(options, processedPath, resourcesDir);
 
         if (result.success) {
           res.json({ success: true, downloadUrl: result.downloadUrl });
@@ -200,54 +250,17 @@ app.post('/test-parse', async (req, res) => {
   }
 
   const epubFile = req.files.epubFile;
-  const uploadPath = path.join(__dirname, 'uploads', epubFile.name);
+  const uploadPath = path.join(uploadsDir, epubFile.name);
 
   try {
-    // Remove existing file if it exists
-    await fs.remove(uploadPath);
+    // Clear temp folder
+    await clearTempFolder();
+
+    // Ensure directories exist
+    await ensureDirectoriesExist();
 
     // Save the uploaded file
     await epubFile.mv(uploadPath);
-
-    // Initialize the EPUB parser
-    const epub = new EPub(uploadPath);
-
-    epub.on('end', async function () {
-      try {
-        const sections = await getAndProcessChapters(epub, new Set());
-
-        res.json({ success: true, sections });
-      } catch (err) {
-        console.error('Error parsing EPUB:', err);
-        res.status(500).json({ success: false, message: 'Error parsing EPUB file.' });
-      }
-    });
-
-    epub.parse();
-  } catch (err) {
-    console.error('Error parsing EPUB:', err);
-    res.status(500).json({ success: false, message: 'Error parsing EPUB file.' });
-  }
-});
-
-// Test route to process EPUB content for debugging
-app.post('/test-process', async (req, res) => {
-  if (!req.files || !req.files.epubFile) {
-    return res.status(400).json({ success: false, message: 'No EPUB file was uploaded.' });
-  }
-
-  const epubFile = req.files.epubFile;
-  const uploadPath = path.join(__dirname, 'uploads', epubFile.name);
-
-  try {
-    // Remove existing file if it exists
-    await fs.remove(uploadPath);
-
-    // Save the uploaded file
-    await epubFile.mv(uploadPath);
-
-    // Load the dictionary
-    const dictionary = await loadDictionary(dictionaryFilePath);
 
     // Initialize the EPUB parser
     const epub = new EPub(uploadPath);
@@ -255,6 +268,11 @@ app.post('/test-process', async (req, res) => {
     epub.on('end', async function () {
       try {
         const sections = await getAndProcessChapters(epub, dictionary);
+
+        // Adjust image paths in each section
+        sections.forEach(section => {
+          section.data = adjustImagePaths(section.data, 'OEBPS/images');
+        });
 
         res.json({ success: true, sections });
       } catch (err) {
@@ -270,6 +288,12 @@ app.post('/test-process', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+// Route to handle any other requests
+app.get('*', (req, res) => {
+  res.status(404).send('Page not found');
+});
+
+app.listen(PORT, async () => {
+  await ensureDirectoriesExist();
   console.log(`Server is running on http://localhost:${PORT}`);
 });
