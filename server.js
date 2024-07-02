@@ -103,7 +103,7 @@ function adjustImagePaths(html, resourcesPath) {
   $('img').each(function () {
     const src = $(this).attr('src');
     if (src) {
-      const newSrc = path.join(resourcesPath, src);
+      const newSrc = path.join(resourcesPath, src).replace(/\\/g, '/');
       $(this).attr('src', newSrc);
     }
   });
