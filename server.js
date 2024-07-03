@@ -14,7 +14,6 @@ const { extractResources, createEpub } = require('./utils/fileUtils');
 const { processHtmlFiles } = require('./utils/htmlProcessor');
 const { extractEpubData, getEpubs } = require('./utils/epubDataUtils');
 const app = express();
-const PORT = 3000;
 const rootDir = __dirname;
 const uploadsDir = path.join(rootDir, 'uploads');
 const processedDir = path.join(rootDir, 'processed');
@@ -22,9 +21,11 @@ const tempDir = path.join(rootDir, 'temp');
 const resourcesDir = path.join(tempDir, 'resources');
 const dictionaryFilePath = path.join(rootDir, 'dictionary.txt');
 const webdavPort = process.env.WEBDAV_PORT || 1900;
+const PORT = process.env.MAIN_PORT || 1900;
 const webdavUsername = process.env.WEBDAV_USERNAME;
 const webdavPassword = process.env.WEBDAV_PASSWORD;
 console.log(webdavUsername, webdavPassword);
+const createOpdsServer = require('./opds/opdsServer');
 
 const result = dotenv.config();
 
@@ -33,6 +34,10 @@ if (result.error) {
 } else {
   console.log('Dotenv config success:', result.parsed);
 }
+
+// Use the OPDS server module
+const opdsApp = createOpdsServer(path.join(__dirname, 'processed'));
+app.use('/opds', opdsApp);
 
 // Session middleware
 app.use(session({

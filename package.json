@@ -20,7 +20,8 @@
         "image-size": "^1.1.1",
         "node-cron": "^3.0.3",
         "webdav": "^5.6.0",
-        "webdav-server": "^2.6.2"
+        "webdav-server": "^2.6.2",
+        "xmlbuilder": "^15.1.1"
     },
     "author": "",
     "license": "ISC"
