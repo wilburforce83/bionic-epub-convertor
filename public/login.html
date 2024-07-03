@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css">
+</head>
+<body>
+  <div class="ui container">
+    <h2 class="ui center aligned icon header">
+      <i class="circular lock icon"></i>
+      Login
+    </h2>
+    <form class="ui form" method="post" action="/login">
+      <div class="field">
+        <label>Username</label>
+        <input type="text" name="username" placeholder="Username" required>
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" name="password" placeholder="Password" required>
+      </div>
+      <button class="ui button" type="submit">Login</button>
+    </form>
+  </div>
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPUB Library</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.2.13/epub.min.js"></script>
+    <style>
+        .ui.container {
+            margin-top: 100px; /* Adjusted to avoid overlapping with the fixed header */
+        }
+        .ui.fixed.menu {
+            top: 0;
+            z-index: 1000;
+            width: 100%;
+        }
+        .image-wrapper {
+            width: 100%;
+            padding-top: 100%; /* 1:1 Aspect Ratio */
+            position: relative;
+            overflow: hidden;
+        }
+        .image-wrapper img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: top;
+        }
+    </style>
+</head>
+<body>
+    <div class="ui top fixed menu">
+        <div class="item">
+            <h2><b>Ope</b>nic</h2>
+        </div>
+        <div class="right menu">
+            <div class="item">
+                <div class="ui icon input">
+                    <input type="text" placeholder="Search..." id="searchBar">
+                    <i class="search icon"></i>
+                </div>
+            </div>
+            <div class="item">
+                <button class="ui icon button" id="updateDatabaseButton">
+                    <i class="sync alternate icon"></i>
+                </button>
+            </div>
+            <div class="item">
+                <button class="ui icon button" id="uploadButton">
+                    <i class="upload icon"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="ui container">
+        <div class="ui link cards" id="epubCards"></div>
+    </div>
+
+    <div class="ui small modal" id="uploadModal">
+        <div class="header">Upload EPUB</div>
+        <div class="content">
+            <form class="ui form" id="uploadForm" enctype="multipart/form-data">
+                <div class="field">
+                    <label>Select EPUB file</label>
+                    <input type="file" name="epubFile" accept=".epub">
+                </div>
+                <button class="ui button" type="submit">Upload</button>
+            </form>
+        </div>
+    </div>
+
+    <footer class="ui inverted vertical footer segment">
+        <div class="ui center aligned container">
+            <p>&copy; 2023 Openic. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        $(document).ready(function() {
+            function loadEpubs() {
+                $.get('/epubs', function(data) {
+                    console.log('Loaded EPUB data:', data); // Debugging statement
+                    const epubCards = data.map(epub => `
+                        <div class="card" data-filename="${epub.filename}">
+                            <div class="image-wrapper">
+                                <img src="${epub.cover}" alt="Cover Image" onerror="this.onerror=null;this.src='/path/to/default-image.jpg';">
+                            </div>
+                            <div class="content">
+                                <div class="header">${epub.title}</div>
+                                <div class="meta">
+                                    <span class="date">${epub.author}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `);
+                    $('#epubCards').html(epubCards);
+                    // Add click event for each card
+                    $('.card').on('click', function() {
+                        const filename = $(this).data('filename');
+                        window.location.href = `reader.html?file=${encodeURIComponent(filename)}`;
+                    });
+                });
+            }
+
+            function filterEpubs() {
+                const query = $('#searchBar').val().toLowerCase();
+                $('.card').each(function() {
+                    const title = $(this).find('.header').text().toLowerCase();
+                    const author = $(this).find('.meta .date').text().toLowerCase();
+                    if (title.includes(query) || author.includes(query)) {
+                        $(this).show();
+                    } else {
+                        $(this).hide();
+                    }
+                });
+            }
+
+            $('#updateDatabaseButton').click(function() {
+                $.post('/update-database', function() {
+                    loadEpubs();
+                });
+            });
+
+            $('#uploadButton').click(function() {
+                $('#uploadModal').modal('show');
+            });
+
+            $('#uploadForm').submit(function(event) {
+                event.preventDefault();
+                const formData = new FormData(this);
+                $.ajax({
+                    url: '/upload',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function() {
+                        $('#uploadModal').modal('hide');
+                        loadEpubs();
+                    },
+                    error: function() {
+                        alert('Error uploading file');
+                    }
+                });
+            });
+
+            $('#searchBar').on('input', function() {
+                filterEpubs();
+            });
+
+            loadEpubs();
+        });
+    </script>
+</body>
+</html>

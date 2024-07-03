@@ -8,12 +8,19 @@
     },
     "dependencies": {
         "adm-zip": "^0.5.14",
+        "body-parser": "^1.20.2",
         "cheerio": "^1.0.0-rc.12",
+        "dotenv": "^16.4.5",
         "epub": "^0.1.0",
         "epub-gen": "^0.1.0",
         "express": "^4.18.2",
         "express-fileupload": "^1.4.0",
-        "fs-extra": "^11.2.0"
+        "express-session": "^1.18.0",
+        "fs-extra": "^11.2.0",
+        "image-size": "^1.1.1",
+        "node-cron": "^3.0.3",
+        "webdav": "^5.6.0",
+        "webdav-server": "^2.6.2"
     },
     "author": "",
     "license": "ISC"
