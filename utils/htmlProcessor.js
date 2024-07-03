@@ -9,15 +9,17 @@ function processTextNodes($, element, dictionary) {
       const processedText = $(this).text().replace(/\b([a-zA-Z'-]+)/g, function (word) {
         const prefixLength = findLongestValidPrefix(word, dictionary);
 
-        if (prefixLength > 0 && prefixLength > 3) {
+        if (prefixLength > 0 && prefixLength > 4) {
           return `<b>${word.slice(0, prefixLength)}</b>${word.slice(prefixLength)}`;
         } else {
-          const midpoint = Math.ceil(word.length / 2);
+          const midpoint = Math.floor(word.length / 2);
           return `<b>${word.slice(0, midpoint)}</b>${word.slice(midpoint)}`;
         }
       });
 
-      $(this).replaceWith(processedText);
+      // Load the processed text into a new cheerio instance to ensure tags are correctly formed
+      const wrappedText = cheerio.load(`<span>${processedText}</span>`);
+      $(this).replaceWith(wrappedText.html());
     } else if (this.type === 'tag' && this.tagName !== 'img') {
       processTextNodes($, this, dictionary); // Recursively process child nodes, skip images
     }

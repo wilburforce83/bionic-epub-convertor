@@ -11,7 +11,7 @@ async function createEpub(resourcesPath, outputPath) {
   try {
     const zip = new AdmZip();
     zip.addLocalFile(path.join(resourcesPath, 'mimetype'));
-    zip.addLocalFolder(resourcesPath, 'OEBPS');
+    zip.addLocalFolder(resourcesPath);
     zip.writeZip(outputPath);
 
     return { success: true, downloadUrl: `/processed/${path.basename(outputPath)}` };

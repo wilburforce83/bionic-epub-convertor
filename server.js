@@ -150,7 +150,7 @@ app.post('/upload', isAuthenticated, async (req, res) => {
 
   try {
     // Clear temp folder
-    await fs.emptyDir(tempDir);
+    await fs.emptyDir(resourcesDir);
 
     // Ensure directories exist
     await ensureDirectoriesExist();
