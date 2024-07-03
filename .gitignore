@@ -11,6 +11,7 @@ lerna-debug.log*
 
 uploads/
 processed/
+temp/
 temp.epub
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
