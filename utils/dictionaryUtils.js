@@ -7,13 +7,23 @@ async function loadDictionary(filePath) {
 }
 
 function findLongestValidPrefix(word, dictionary) {
+  let longestPrefixLength = 0;
+
   for (let i = word.length; i > 0; i--) {
     if (dictionary.has(word.slice(0, i))) {
-      return i;
+      longestPrefixLength = i;
+      break;
     }
   }
-  return 0;
+
+  const maxAllowedLength = Math.floor(word.length / 1.7);
+  if (longestPrefixLength > maxAllowedLength) {
+    return maxAllowedLength;
+  }
+
+  return longestPrefixLength;
 }
+
 
 module.exports = {
   loadDictionary,

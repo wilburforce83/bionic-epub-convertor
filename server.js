@@ -13,6 +13,7 @@ const { loadDictionary } = require('./utils/dictionaryUtils');
 const { extractResources, createEpub } = require('./utils/fileUtils');
 const { processHtmlFiles } = require('./utils/htmlProcessor');
 const { extractEpubData, getEpubs } = require('./utils/epubDataUtils');
+const SimpleJsonDB = require('simple-json-db');
 const app = express();
 const rootDir = __dirname;
 const uploadsDir = path.join(rootDir, 'uploads');
@@ -20,12 +21,13 @@ const processedDir = path.join(rootDir, 'processed');
 const tempDir = path.join(rootDir, 'temp');
 const resourcesDir = path.join(tempDir, 'resources');
 const dictionaryFilePath = path.join(rootDir, 'dictionary.txt');
-const webdavPort = process.env.WEBDAV_PORT || 1900;
-const PORT = process.env.MAIN_PORT || 1900;
+var webdavPort = process.env.WEBDAV_PORT || 1900;
+var PORT = process.env.MAIN_PORT || 3000;
 const webdavUsername = process.env.WEBDAV_USERNAME;
 const webdavPassword = process.env.WEBDAV_PASSWORD;
 console.log(webdavUsername, webdavPassword);
 const createOpdsServer = require('./opds/opdsServer');
+const { exec } = require('child_process');
 
 const result = dotenv.config();
 
@@ -34,6 +36,19 @@ if (result.error) {
 } else {
   console.log('Dotenv config success:', result.parsed);
 }
+
+// Initialize SimpleJsonDB for settings
+const db = new SimpleJsonDB(path.join('./db/db.json'));
+
+if (db.has('webdavPort')){
+webdavPort = db.get('webdavPort');
+console.log('using saved webdav port: ',webdavPort);
+}
+
+if (db.has('opdsPort')){
+  webdavPort = db.get('opds');
+  console.log('using saved port: ',PORT);
+  }
 
 // Use the OPDS server module
 const opdsApp = createOpdsServer(path.join(__dirname, 'processed'));
@@ -100,7 +115,6 @@ app.get('/', isAuthenticated, (req, res) => {
 app.use('/authenticated', isAuthenticated, express.static(path.join(rootDir, 'authenticated')));
 app.use('/epub', express.static(processedDir));
 
-
 // Route to get the list of EPUBs
 app.get('/epubs', async (req, res) => {
   try {
@@ -124,8 +138,6 @@ app.get('/epub/:filename', (req, res) => {
     }
   });
 });
-
-
 
 // Route to update the EPUB database
 app.post('/update-database', isAuthenticated, async (req, res) => {
@@ -180,6 +192,46 @@ app.post('/upload', isAuthenticated, async (req, res) => {
     console.error('Error processing EPUB:', err);
     res.status(500).json({ success: false, message: 'Error processing EPUB file.' });
   }
+});
+
+// Route to get settings
+app.get('/settings', isAuthenticated, (req, res) => {
+  try {
+    const settings = db.JSON();
+    res.json(settings);
+  } catch (err) {
+    console.error('Error fetching settings:', err);
+    res.status(500).json({ success: false, message: 'Error fetching settings.' });
+  }
+});
+
+// Route to update settings
+app.post('/settings', isAuthenticated, (req, res) => {
+  try {
+    const settings = req.body;
+    console.log(settings);
+    db.JSON(settings);
+    db.sync();
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error updating settings:', err);
+    res.status(500).json({ success: false, message: 'Error updating settings.' });
+  }
+});
+
+// Route to restart the server
+app.post('/restart-server', isAuthenticated, (req, res) => {
+  res.json({ success: true, message: 'Server is restarting...' });
+  setTimeout(() => {
+    exec('pm2 restart dyslibria', (error, stdout, stderr) => {
+      if (error) {
+        console.error(`exec error: ${error}`);
+        return;
+      }
+      console.log(`stdout: ${stdout}`);
+      console.error(`stderr: ${stderr}`);
+    });
+  }, 1000); // Delay to ensure the response is sent before the server restarts
 });
 
 // Schedule the database update every 4 hours

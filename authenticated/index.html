@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,19 +10,24 @@
     <script src="semantic.min.js"></script>
     <style>
         .ui.container {
-            margin-top: 100px; /* Adjusted to avoid overlapping with the fixed header */
+            margin-top: 100px;
+            /* Adjusted to avoid overlapping with the fixed header */
         }
+
         .ui.fixed.menu {
             top: 0;
             z-index: 1000;
             width: 100%;
         }
+
         .image-wrapper {
             width: 100%;
-            padding-top: 100%; /* 1:1 Aspect Ratio */
+            padding-top: 100%;
+            /* 1:1 Aspect Ratio */
             position: relative;
             overflow: hidden;
         }
+
         .image-wrapper img {
             position: absolute;
             top: 0;
@@ -33,10 +39,11 @@
         }
     </style>
 </head>
+
 <body>
-    <div class="ui top fixed menu">
+    <div class="ui olive top fixed menu">
         <div class="item">
-            <h2><b>Ope</b>nic</h2>
+            <h2 style="font-weight: 300;"><span style="font-weight: 600;">Dysli</span>bria</h2>
         </div>
         <div class="right menu">
             <div class="item">
@@ -53,6 +60,11 @@
             <div class="item">
                 <button class="ui icon button" id="uploadButton">
                     <i class="upload icon"></i>
+                </button>
+            </div>
+            <div class="item">
+                <button class="ui icon button" id="settingsButton">
+                    <i class="settings icon"></i>
                 </button>
             </div>
         </div>
@@ -72,21 +84,42 @@
                     <label>Select EPUB file</label>
                     <input type="file" name="epubFile" accept=".epub">
                 </div>
-                <button class="ui button" type="submit">Upload</button>
+                <button class="ui button" type="submit">Convert and Add to Library</button>
             </form>
         </div>
     </div>
 
-    <footer class="ui inverted vertical footer segment">
+    <div class="ui small modal" id="settingsModal">
+        <div class="header">Settings</div>
+        <div class="content">
+            <form class="ui form" id="settingsForm">
+                <div class="field">
+                    <label>WebDAV port</label>
+                    <input type="text" name="webdavPort" placeholder="">
+                </div>
+                <div class="field">
+                    <label>OPDS and Webapp port</label>
+                    <input type="text" name="opdsPort" placeholder="">
+                </div>
+            </form>
+        </div>
+        <div class="actions">
+            <button class="ui button" id="cancelSettingsButton">Cancel</button>
+            <button class="ui button" id="saveSettingsButton">Save</button>
+            <button class="ui button" id="restartServerButton">Restart Server</button>
+        </div>
+    </div>
+
+    <footer class="ui inverted vertical fixed footer segment">
         <div class="ui center aligned container">
-            <p>&copy; 2023 Openic. All rights reserved.</p>
+            <p>&copy; 2023 Dyslibria.</p>
         </div>
     </footer>
 
     <script>
-        $(document).ready(function() {
+        $(document).ready(function () {
             function loadEpubs() {
-                $.get('/epubs', function(data) {
+                $.get('/epubs', function (data) {
                     console.log('Loaded EPUB data:', data); // Debugging statement
                     const epubCards = data.map(epub => `
                         <div class="card" data-filename="${epub.filename}">
@@ -103,7 +136,7 @@
                     `);
                     $('#epubCards').html(epubCards);
                     // Add click event for each card
-                    $('.card').on('click', function() {
+                    $('.card').on('click', function () {
                         const filename = $(this).data('filename');
                         window.location.href = `reader.html?file=${encodeURIComponent(filename)}`;
                     });
@@ -112,7 +145,7 @@
 
             function filterEpubs() {
                 const query = $('#searchBar').val().toLowerCase();
-                $('.card').each(function() {
+                $('.card').each(function () {
                     const title = $(this).find('.header').text().toLowerCase();
                     const author = $(this).find('.meta .date').text().toLowerCase();
                     if (title.includes(query) || author.includes(query)) {
@@ -123,17 +156,17 @@
                 });
             }
 
-            $('#updateDatabaseButton').click(function() {
-                $.post('/update-database', function() {
+            $('#updateDatabaseButton').click(function () {
+                $.post('/update-database', function () {
                     loadEpubs();
                 });
             });
 
-            $('#uploadButton').click(function() {
+            $('#uploadButton').click(function () {
                 $('#uploadModal').modal('show');
             });
 
-            $('#uploadForm').submit(function(event) {
+            $('#uploadForm').submit(function (event) {
                 event.preventDefault();
                 const formData = new FormData(this);
                 $.ajax({
@@ -142,22 +175,54 @@
                     data: formData,
                     processData: false,
                     contentType: false,
-                    success: function() {
+                    success: function () {
                         $('#uploadModal').modal('hide');
                         loadEpubs();
                     },
-                    error: function() {
+                    error: function () {
                         alert('Error uploading file');
                     }
                 });
             });
 
-            $('#searchBar').on('input', function() {
+            $('#searchBar').on('input', function () {
                 filterEpubs();
             });
+
+           
+            $('#settingsButton').click(function () {
+                $.get('/settings', function (data) {
+                    $('#settingsForm').find('input[name="webdavPort"]').val(data.webdavPort);
+                    $('#settingsForm').find('input[name="opdsPort"]').val(data.opdsPort);
+                    $('#settingsModal').modal('show');
+                });
+            });
+
+            $('#cancelSettingsButton').click(function () {
+                $('#settingsModal').modal('hide');
+            });
+
+            $('#saveSettingsButton').click(function () {
+                const settingsData = $('#settingsForm').serialize();
+                $.post('/settings', settingsData, function () {
+                    $('#settingsModal').modal('hide');
+                }).fail(function () {
+                    alert('Error saving settings');
+                });
+            });
+
+            $('#restartServerButton').click(function () {
+                $.post('/restart-server', function () {
+                    alert('Server is restarting...');
+                }).fail(function () {
+                    alert('Error restarting server');
+                });
+            });
+
 
             loadEpubs();
         });
     </script>
 </body>
+
 </html>
