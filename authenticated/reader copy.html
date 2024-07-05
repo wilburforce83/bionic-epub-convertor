@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dyslibria Reader</title>
+  <link rel="stylesheet" type="text/css" href="examples.css">
+  <script src="jszip.min.js"></script>
+  <script src="epub.js"></script>
+  <!-- Load a custom font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap"
+    rel="stylesheet">
+  <style>
+    
+  </style>
+</head>
+
+<body>
+  <select id="toc"></select>
+  <div id="viewer" class="spreads"></div>
+  <a id="prev" href="#prev" class="arrow">‹</a>
+  <a id="next" href="#next" class="arrow">›</a>
+</body>
+
+<script>
+  var params = URLSearchParams && new URLSearchParams(document.location.search.substring(1));
+  var url = params && params.get("file") && decodeURIComponent(params.get("file"));
+  var currentSectionIndex = (params && params.get("loc")) ? params.get("loc") : undefined;
+
+  document.addEventListener("DOMContentLoaded", function () {
+    console.log("DOM fully loaded and parsed");
+    if (!url) {
+      alert('No EPUB file specified.');
+      return;
+    }
+
+    // Load the EPUB file
+    var book = ePub(`/epub/${url}`);
+    var rendition = book.renderTo("viewer", {
+      width: "100%",
+      height: 600,
+      spread: "always"
+    });
+
+    // Inject custom font CSS
+    rendition.themes.default({
+      'h1': {
+        'font-family': "'Quicksand', sans-serif",
+        'font-weight': '700'  // Example for headings
+      },
+      'h2': {
+        'font-family': "'Quicksand', sans-serif",
+        'font-weight': '600'  // Example for sub-headings
+      },
+      'p': {
+        'font-family': "'Quicksand', sans-serif !important;",
+        'font-weight': '400 !important;',
+        'font-size': '0.9em !important;'
+      },
+      'b': {
+        'font-family': "'Quicksand', sans-serif !important;",
+        'font-weight': '600 !important;',
+        'font-size': '0.95em !important;'
+      }
+    });
+
+    // Function to save the reading position to localStorage
+    function saveReadingPosition(book, location) {
+      var bookInfo = {
+        title: book.package.metadata.title,
+        author: book.package.metadata.creator,
+        location: location
+      };
+      localStorage.setItem(url, JSON.stringify(bookInfo));
+    }
+
+    // Function to load the reading position from localStorage
+    function loadReadingPosition(book) {
+      var bookInfo = JSON.parse(localStorage.getItem(url));
+      if (bookInfo && bookInfo.location) {
+        rendition.display(bookInfo.location);
+      } else {
+        rendition.display(currentSectionIndex);
+      }
+    }
+
+    rendition.display(currentSectionIndex);
+
+    book.ready.then(function () {
+
+      var next = document.getElementById("next");
+
+      next.addEventListener("click", function (e) {
+        book.package.metadata.direction === "rtl" ? rendition.prev() : rendition.next();
+        e.preventDefault();
+      }, false);
+
+      var prev = document.getElementById("prev");
+      prev.addEventListener("click", function (e) {
+        book.package.metadata.direction === "rtl" ? rendition.next() : rendition.prev();
+        e.preventDefault();
+      }, false);
+
+      var keyListener = function (e) {
+        // Left Key
+        if ((e.keyCode || e.which) == 37) {
+          book.package.metadata.direction === "rtl" ? rendition.next() : rendition.prev();
+        }
+        // Right Key
+        if ((e.keyCode || e.which) == 39) {
+          book.package.metadata.direction === "rtl" ? rendition.prev() : rendition.next();
+        }
+      };
+
+      rendition.on("keyup", keyListener);
+      document.addEventListener("keyup", keyListener, false);
+      
+      // Load the saved reading position
+      loadReadingPosition(book);
+
+      // Save reading position on page turn
+      rendition.on("relocated", function (location) {
+        console.log(location);
+        saveReadingPosition(book, location.start.cfi);
+
+        var next = book.package.metadata.direction === "rtl" ? document.getElementById("prev") : document.getElementById("next");
+        var prev = book.package.metadata.direction === "rtl" ? document.getElementById("next") : document.getElementById("prev");
+
+        if (location.atEnd) {
+          next.style.visibility = "hidden";
+        } else {
+          next.style.visibility = "visible";
+        }
+
+        if (location.atStart) {
+          prev.style.visibility = "hidden";
+        } else {
+          prev.style.visibility = "visible";
+        }
+      });
+
+    });
+
+    var title = document.getElementById("title");
+
+    rendition.on("rendered", function (section) {
+      var current = book.navigation && book.navigation.get(section.href);
+
+      if (current) {
+        var $select = document.getElementById("toc");
+        var $selected = $select.querySelector("option[selected]");
+        if ($selected) {
+          $selected.removeAttribute("selected");
+        }
+
+        var $options = $select.querySelectorAll("option");
+        for (var i = 0; i < $options.length; ++i) {
+          let selected = $options[i].getAttribute("ref") === current.href;
+          if (selected) {
+            $options[i].setAttribute("selected", "");
+          }
+        }
+      }
+
+    });
+
+    rendition.on("layout", function (layout) {
+      let viewer = document.getElementById("viewer");
+
+      if (layout.spread) {
+        viewer.classList.remove('single');
+      } else {
+        viewer.classList.add('single');
+      }
+    });
+
+    window.addEventListener("unload", function () {
+      console.log("unloading");
+      this.book.destroy();
+    });
+
+    book.loaded.navigation.then(function (toc) {
+      var $select = document.getElementById("toc"),
+        docfrag = document.createDocumentFragment();
+
+      toc.forEach(function (chapter) {
+        var option = document.createElement("option");
+        option.textContent = chapter.label;
+        option.setAttribute("ref", chapter.href);
+
+        docfrag.appendChild(option);
+      });
+
+      $select.appendChild(docfrag);
+
+      $select.onchange = function () {
+        var index = $select.selectedIndex,
+          url = $select.options[index].getAttribute("ref");
+        rendition.display(url);
+        return false;
+      };
+
+    });
+
+
+  });
+</script>
+
+</html>
