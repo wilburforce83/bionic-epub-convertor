@@ -9,7 +9,16 @@
     <script src="jquery.js"></script>
     <script src="semantic.min.js"></script>
     <style>
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
         .ui.container {
+            flex: 1;
             margin-top: 100px;
         }
 
@@ -17,6 +26,7 @@
             top: 0;
             z-index: 1000;
             width: 100%;
+            background-color: white;
         }
 
         .image-wrapper {
@@ -46,6 +56,93 @@
 
         .drop-zone.dragover {
             border-color: #333;
+        }
+
+        footer {
+            position: sticky;
+            bottom: 0;
+            width: 100%;
+            background-color: #1b1c1d;
+            color: #fff;
+            padding: 10px 0;
+            text-align: center;
+        }
+
+        .mobile-header {
+            display: none;
+            background-color: white;
+            padding: 10px;
+            width: 100%;
+            position: fixed;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .mobile-header .menu-icon {
+            font-size: 1.5em;
+        }
+
+        .mobile-header h2 {
+            margin: 0;
+            font-size: 1.2em;
+        }
+
+        .mobile-header .menu {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .mobile-menu {
+            display: none;
+            position: fixed;
+            top: 50px;
+            left: 0;
+            width: 100%;
+            background-color: white;
+            z-index: 1001;
+            padding: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+        }
+
+        .mobile-menu a {
+            display: block;
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+        }
+
+        .mobile-menu a:last-child {
+            border-bottom: none;
+        }
+
+        @media (max-width: 767px) {
+            .ui.fixed.menu {
+                display: none;
+            }
+
+            .ui.menu {
+                width: 100%;
+            }
+
+            .mobile-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                width: 100%;
+            }
+
+            .ui.container {
+                margin-top: 70px;
+                /* Adjust this value to match the height of the mobile header */
+            }
+
+            .ui.stackable.cards {
+                display: flex;
+                padding-top: 50px;
+                padding-bottom: 50px;
+                padding-right: 100px;
+                padding-left: 100px;
+            }
         }
     </style>
 </head>
@@ -80,8 +177,40 @@
         </div>
     </div>
 
+    <div class="mobile-header">
+        <div class="ui menu">
+            <div class="item">
+                <div class="menu-icon" id="mobileMenuIcon">
+                    <i class="bars icon"></i>
+                </div>
+            </div>
+            <div class="item">
+                <h2><span style="font-weight: 600;">Dysli</span>bria</h2>
+            </div>
+            <div class="right item">
+                <div class="ui icon input">
+                    <input type="text" placeholder="Search..." id="mobileSearchBar">
+                    <i class="search icon"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="#" id="mobileUploadButton">Upload</a>
+        <a href="#" id="mobileUpdateDatabaseButton">Refresh Library</a>
+        <a href="#" id="mobileSettingsButton">Settings</a>
+    </div>
+
     <div class="ui container">
-        <div class="ui link cards" id="epubCards"></div>
+        <div class="ui link four stackable cards" id="epubCards"></div>
+    </div>
+
+    <div class="ui container">
+        <p></p>
+        <p></p>
+        <p></p>
+        <p></p>
     </div>
 
     <div class="ui small modal" id="uploadModal">
@@ -102,13 +231,23 @@
         <div class="header">Settings</div>
         <div class="content">
             <form class="ui form" id="settingsForm">
-                <div class="field">
-                    <label>WebDAV port</label>
-                    <input type="text" name="webdavPort" placeholder="">
+                <div class="fields">
+                    <div class="field">
+                        <label>WebDAV port</label>
+                        <input type="text" name="webdavPort" placeholder="">
+                    </div>
+                    <div class="field">
+                        <label>OPDS and Webapp port</label>
+                        <input type="text" name="opdsPort" placeholder="">
+                    </div>
                 </div>
                 <div class="field">
-                    <label>OPDS and Webapp port</label>
-                    <input type="text" name="opdsPort" placeholder="">
+                    <label>Upload path (absolute)</label>
+                    <input type="text" name="uploadPath" placeholder="">
+                </div>
+                <div class="field">
+                    <label>Library path (absolute)</label>
+                    <input type="text" name="libraryPath" placeholder="">
                 </div>
             </form>
         </div>
@@ -119,10 +258,8 @@
         </div>
     </div>
 
-    <footer class="ui inverted vertical fixed footer segment">
-        <div class="ui center aligned container">
-            <p>&copy; 2023 Dyslibria.</p>
-        </div>
+    <footer class="ui inverted vertical footer center aligned segment">
+        <p>&copy; 2023 Dyslibria.</p>
     </footer>
 
     <script>
@@ -151,27 +288,27 @@
                 });
             }
 
-            function filterEpubs() {
-                const query = $('#searchBar').val().toLowerCase();
+            function filterEpubs(query) {
                 $('.card').each(function () {
                     const title = $(this).find('.header').text().toLowerCase();
                     const author = $(this).find('.meta .date').text().toLowerCase();
                     if (title.includes(query) || author.includes(query)) {
-                        $(this).show();
+                        $(this).css('display', 'block'); // Show element
                     } else {
-                        $(this).hide();
+                        this.style.setProperty('display', 'none', 'important'); // Forcefully hide element
                     }
                 });
             }
 
-            $('#updateDatabaseButton').click(function () {
+            $('#updateDatabaseButton, #mobileUpdateDatabaseButton').click(function () {
                 $.post('/update-database', function () {
                     loadEpubs();
                 });
             });
 
-            $('#uploadButton').click(function () {
+            $('#uploadButton, #mobileUploadButton').click(function () {
                 $('#uploadModal').modal('show');
+                $('#mobileMenu').hide(); // Close mobile menu if open
             });
 
             $('#uploadForm').submit(function (event) {
@@ -222,15 +359,19 @@
                 $('#dropZone').text(files.length > 1 ? `${files.length} files selected` : files[0].name);
             });
 
-            $('#searchBar').on('input', function () {
-                filterEpubs();
+            $('#searchBar, #mobileSearchBar').on('input', function () {
+                const query = $(this).val().toLowerCase();
+                filterEpubs(query);
             });
 
-            $('#settingsButton').click(function () {
+            $('#settingsButton, #mobileSettingsButton').click(function () {
                 $.get('/settings', function (data) {
                     $('#settingsForm').find('input[name="webdavPort"]').val(data.webdavPort);
                     $('#settingsForm').find('input[name="opdsPort"]').val(data.opdsPort);
+                    $('#settingsForm').find('input[name="uploadPath"]').val(data.uploadPath);
+                    $('#settingsForm').find('input[name="libraryPath"]').val(data.libraryPath);
                     $('#settingsModal').modal('show');
+                    $('#mobileMenu').hide(); // Close mobile menu if open
                 });
             });
 
@@ -253,6 +394,10 @@
                 }).fail(function () {
                     alert('Error restarting server');
                 });
+            });
+
+            $('#mobileMenuIcon').click(function () {
+                $('#mobileMenu').toggle();
             });
 
             loadEpubs();

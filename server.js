@@ -18,8 +18,8 @@ const SimpleJsonDB = require('simple-json-db');
 const AdmZip = require('adm-zip');
 const app = express();
 const rootDir = __dirname;
-const uploadsDir = path.join(rootDir, 'uploads');
-const processedDir = path.join(rootDir, 'processed');
+var uploadsDir = path.join(rootDir, 'uploads');
+var processedDir = path.join(rootDir, 'processed');
 const tempDir = path.join(rootDir, 'temp');
 const resourcesDir = path.join(tempDir, 'resources');
 const dictionaryFilePath = path.join(rootDir, 'dictionary.txt');
@@ -52,8 +52,24 @@ if (db.has('opdsPort')) {
   console.log('using saved port: ', PORT);
 }
 
+if (db.has('libraryPath')) {
+  processedDir = db.get('libraryPath');
+  console.log('using saved library dir: ', processedDir);
+} else {
+  db.set('libraryPath',processedDir);
+  db.sync();
+}
+
+if (db.has('uploadPath')) {
+  uploadsDir = db.get('uploadPath');
+  console.log('using saved upload dir: ', uploadsDir);
+} else {
+  db.set('uploadPath',uploadsDir);
+  db.sync();
+}
+
 // Use the OPDS server module
-const opdsApp = createOpdsServer(path.join(__dirname, 'processed'));
+const opdsApp = createOpdsServer(processedDir);
 app.use('/opds', opdsApp);
 
 // Session middleware

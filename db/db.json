@@ -1,4 +1,6 @@
 {
     "webdavPort": "1900",
-    "opdsPort": "3000"
+    "opdsPort": "3000",
+    "uploadPath": "C:\\Users\\user\\OneDrive - Green-Create\\Documents\\Coding Bits\\bionic-epub-convertor\\uploads",
+    "libraryPath": "C:\\Users\\user\\OneDrive - Green-Create\\Documents\\Coding Bits\\bionic-epub-convertor\\processed"
 }
