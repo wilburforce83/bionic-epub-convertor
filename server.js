@@ -18,8 +18,8 @@ const SimpleJsonDB = require('simple-json-db');
 const AdmZip = require('adm-zip');
 const app = express();
 const rootDir = __dirname;
-var uploadsDir = path.join(rootDir, 'uploads');
-var processedDir = path.join(rootDir, 'processed');
+const uploadsDir = path.join(rootDir, 'uploads');
+const processedDir = path.join(rootDir, 'processed');
 const tempDir = path.join(rootDir, 'temp');
 const resourcesDir = path.join(tempDir, 'resources');
 const dictionaryFilePath = path.join(rootDir, 'dictionary.txt');
@@ -52,24 +52,8 @@ if (db.has('opdsPort')) {
   console.log('using saved port: ', PORT);
 }
 
-if (db.has('libraryPath')) {
-  processedDir = db.get('libraryPath');
-  console.log('using saved library dir: ', processedDir);
-} else {
-  db.set('libraryPath',processedDir);
-  db.sync();
-}
-
-if (db.has('uploadPath')) {
-  uploadsDir = db.get('uploadPath');
-  console.log('using saved upload dir: ', uploadsDir);
-} else {
-  db.set('uploadPath',uploadsDir);
-  db.sync();
-}
-
 // Use the OPDS server module
-const opdsApp = createOpdsServer(processedDir);
+const opdsApp = createOpdsServer(path.join(__dirname, 'processed'));
 app.use('/opds', opdsApp);
 
 // Session middleware
@@ -100,18 +84,11 @@ function isAuthenticated(req, res, next) {
 
 // Ensure directories exist
 async function ensureDirectoriesExist() {
-  const directories = [uploadsDir, processedDir, tempDir, resourcesDir];
-  for (const dir of directories) {
-    await fs.ensureDir(dir);
-  }
+  await fs.ensureDir(uploadsDir);
+  await fs.ensureDir(processedDir);
+  await fs.ensureDir(tempDir);
+  await fs.ensureDir(resourcesDir);
 }
-
-// Call the function to ensure directories exist on file load
-ensureDirectoriesExist().then(() => {
-  console.log('All directories ensured.');
-}).catch((error) => {
-  console.error('Error ensuring directories:', error);
-});
 
 // Basic route to serve the login page
 app.get('/login', (req, res) => {
@@ -253,7 +230,16 @@ async function processEpubFile(epubPath) {
   } catch (err) {
     console.error(`Error processing EPUB: ${err.message}`, err);
   } finally {
-      const index = fileQueue.indexOf(epubPath);
+    // Delete the file from uploads directory
+    try {
+      await fs.remove(epubPath);
+      console.log(`Deleted file from uploads directory: ${epubPath}`);
+    } catch (err) {
+      console.error('Error deleting EPUB file:', err);
+    }
+
+    // Remove the file from the queue
+    const index = fileQueue.indexOf(epubPath);
     if (index > -1) {
       fileQueue.splice(index, 1);
     }

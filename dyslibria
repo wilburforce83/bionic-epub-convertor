@@ -1,0 +1,256 @@
+Error: Cannot find module 'chokidar'
+Require stack:
+- /home/wilbur/bionic-epub-convertor/server.js
+    at Function.Module._resolveFilename (node:internal/modules/cjs/loader:1028:15)
+    at Module.Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/cjs/helpers:119:18)
+    at Object.<anonymous> (/home/wilbur/bionic-epub-convertor/server.js:8:18)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1252:10)
+    at Module.load (node:internal/modules/cjs/loader:1076:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:911:12)
+    at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/home/wilbur/bionic-epub-convertor/server.js' ]
+}
+Error: Cannot find module 'chokidar'
+Require stack:
+- /home/wilbur/bionic-epub-convertor/server.js
+    at Function.Module._resolveFilename (node:internal/modules/cjs/loader:1028:15)
+    at Module.Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/cjs/helpers:119:18)
+    at Object.<anonymous> (/home/wilbur/bionic-epub-convertor/server.js:8:18)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1252:10)
+    at Module.load (node:internal/modules/cjs/loader:1076:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:911:12)
+    at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/home/wilbur/bionic-epub-convertor/server.js' ]
+}
+Error: Cannot find module 'chokidar'
+Require stack:
+- /home/wilbur/bionic-epub-convertor/server.js
+    at Function.Module._resolveFilename (node:internal/modules/cjs/loader:1028:15)
+    at Module.Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/cjs/helpers:119:18)
+    at Object.<anonymous> (/home/wilbur/bionic-epub-convertor/server.js:8:18)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1252:10)
+    at Module.load (node:internal/modules/cjs/loader:1076:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:911:12)
+    at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/home/wilbur/bionic-epub-convertor/server.js' ]
+}
+Error: Cannot find module 'chokidar'
+Require stack:
+- /home/wilbur/bionic-epub-convertor/server.js
+    at Function.Module._resolveFilename (node:internal/modules/cjs/loader:1028:15)
+    at Module.Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/cjs/helpers:119:18)
+    at Object.<anonymous> (/home/wilbur/bionic-epub-convertor/server.js:8:18)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1252:10)
+    at Module.load (node:internal/modules/cjs/loader:1076:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:911:12)
+    at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/home/wilbur/bionic-epub-convertor/server.js' ]
+}
+Error: Cannot find module 'chokidar'
+Require stack:
+- /home/wilbur/bionic-epub-convertor/server.js
+    at Function.Module._resolveFilename (node:internal/modules/cjs/loader:1028:15)
+    at Module.Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/cjs/helpers:119:18)
+    at Object.<anonymous> (/home/wilbur/bionic-epub-convertor/server.js:8:18)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1252:10)
+    at Module.load (node:internal/modules/cjs/loader:1076:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:911:12)
+    at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/home/wilbur/bionic-epub-convertor/server.js' ]
+}
+Error: Cannot find module 'chokidar'
+Require stack:
+- /home/wilbur/bionic-epub-convertor/server.js
+    at Function.Module._resolveFilename (node:internal/modules/cjs/loader:1028:15)
+    at Module.Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/cjs/helpers:119:18)
+    at Object.<anonymous> (/home/wilbur/bionic-epub-convertor/server.js:8:18)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1252:10)
+    at Module.load (node:internal/modules/cjs/loader:1076:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:911:12)
+    at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/home/wilbur/bionic-epub-convertor/server.js' ]
+}
+Error: Cannot find module 'chokidar'
+Require stack:
+- /home/wilbur/bionic-epub-convertor/server.js
+    at Function.Module._resolveFilename (node:internal/modules/cjs/loader:1028:15)
+    at Module.Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/cjs/helpers:119:18)
+    at Object.<anonymous> (/home/wilbur/bionic-epub-convertor/server.js:8:18)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1252:10)
+    at Module.load (node:internal/modules/cjs/loader:1076:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:911:12)
+    at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/home/wilbur/bionic-epub-convertor/server.js' ]
+}
+Error: Cannot find module 'chokidar'
+Require stack:
+- /home/wilbur/bionic-epub-convertor/server.js
+    at Function.Module._resolveFilename (node:internal/modules/cjs/loader:1028:15)
+    at Module.Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/cjs/helpers:119:18)
+    at Object.<anonymous> (/home/wilbur/bionic-epub-convertor/server.js:8:18)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1252:10)
+    at Module.load (node:internal/modules/cjs/loader:1076:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:911:12)
+    at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/home/wilbur/bionic-epub-convertor/server.js' ]
+}
+Error: Cannot find module 'chokidar'
+Require stack:
+- /home/wilbur/bionic-epub-convertor/server.js
+    at Function.Module._resolveFilename (node:internal/modules/cjs/loader:1028:15)
+    at Module.Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/cjs/helpers:119:18)
+    at Object.<anonymous> (/home/wilbur/bionic-epub-convertor/server.js:8:18)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1252:10)
+    at Module.load (node:internal/modules/cjs/loader:1076:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:911:12)
+    at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/home/wilbur/bionic-epub-convertor/server.js' ]
+}
+Error: Cannot find module 'chokidar'
+Require stack:
+- /home/wilbur/bionic-epub-convertor/server.js
+    at Function.Module._resolveFilename (node:internal/modules/cjs/loader:1028:15)
+    at Module.Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/cjs/helpers:119:18)
+    at Object.<anonymous> (/home/wilbur/bionic-epub-convertor/server.js:8:18)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1252:10)
+    at Module.load (node:internal/modules/cjs/loader:1076:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:911:12)
+    at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/home/wilbur/bionic-epub-convertor/server.js' ]
+}
+Error: Cannot find module 'chokidar'
+Require stack:
+- /home/wilbur/bionic-epub-convertor/server.js
+    at Function.Module._resolveFilename (node:internal/modules/cjs/loader:1028:15)
+    at Module.Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/cjs/helpers:119:18)
+    at Object.<anonymous> (/home/wilbur/bionic-epub-convertor/server.js:8:18)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1252:10)
+    at Module.load (node:internal/modules/cjs/loader:1076:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:911:12)
+    at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/home/wilbur/bionic-epub-convertor/server.js' ]
+}
+Error: Cannot find module 'chokidar'
+Require stack:
+- /home/wilbur/bionic-epub-convertor/server.js
+    at Function.Module._resolveFilename (node:internal/modules/cjs/loader:1028:15)
+    at Module.Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/cjs/helpers:119:18)
+    at Object.<anonymous> (/home/wilbur/bionic-epub-convertor/server.js:8:18)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1252:10)
+    at Module.load (node:internal/modules/cjs/loader:1076:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:911:12)
+    at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/home/wilbur/bionic-epub-convertor/server.js' ]
+}
+Error: Cannot find module 'chokidar'
+Require stack:
+- /home/wilbur/bionic-epub-convertor/server.js
+    at Function.Module._resolveFilename (node:internal/modules/cjs/loader:1028:15)
+    at Module.Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/cjs/helpers:119:18)
+    at Object.<anonymous> (/home/wilbur/bionic-epub-convertor/server.js:8:18)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1252:10)
+    at Module.load (node:internal/modules/cjs/loader:1076:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:911:12)
+    at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/home/wilbur/bionic-epub-convertor/server.js' ]
+}
+Error: Cannot find module 'chokidar'
+Require stack:
+- /home/wilbur/bionic-epub-convertor/server.js
+    at Function.Module._resolveFilename (node:internal/modules/cjs/loader:1028:15)
+    at Module.Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/cjs/helpers:119:18)
+    at Object.<anonymous> (/home/wilbur/bionic-epub-convertor/server.js:8:18)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1252:10)
+    at Module.load (node:internal/modules/cjs/loader:1076:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:911:12)
+    at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/home/wilbur/bionic-epub-convertor/server.js' ]
+}
+Error: Cannot find module 'chokidar'
+Require stack:
+- /home/wilbur/bionic-epub-convertor/server.js
+    at Function.Module._resolveFilename (node:internal/modules/cjs/loader:1028:15)
+    at Module.Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/cjs/helpers:119:18)
+    at Object.<anonymous> (/home/wilbur/bionic-epub-convertor/server.js:8:18)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1252:10)
+    at Module.load (node:internal/modules/cjs/loader:1076:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:911:12)
+    at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/home/wilbur/bionic-epub-convertor/server.js' ]
+}
+Error: Cannot find module 'chokidar'
+Require stack:
+- /home/wilbur/bionic-epub-convertor/server.js
+    at Function.Module._resolveFilename (node:internal/modules/cjs/loader:1028:15)
+    at Module.Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/cjs/helpers:119:18)
+    at Object.<anonymous> (/home/wilbur/bionic-epub-convertor/server.js:8:18)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1252:10)
+    at Module.load (node:internal/modules/cjs/loader:1076:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:911:12)
+    at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/home/wilbur/bionic-epub-convertor/server.js' ]
+}

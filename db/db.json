@@ -1,4 +1,6 @@
 {
-    "libraryPath": "/Users/willshearer/bionic-epub-convertor/processed",
-    "uploadPath": "/Users/willshearer/bionic-epub-convertor/uploads"
+    "webdavPort": "1900",
+    "opdsPort": "3000",
+    "uploadPath": "/home/wilbur/bionic-epub-convertor/uploads",
+    "libraryPath": "/home/wilbur/bionic-epub-convertor/processed"
 }

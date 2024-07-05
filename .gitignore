@@ -9,12 +9,6 @@ lerna-debug.log*
 
 # File system ignores
 
-uploads/
-db/
-processed/
-temp/*
-temp/
-resources/
 temp.epub
 content.opf
 mimetype
