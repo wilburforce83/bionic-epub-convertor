@@ -100,11 +100,18 @@ function isAuthenticated(req, res, next) {
 
 // Ensure directories exist
 async function ensureDirectoriesExist() {
-  await fs.ensureDir(uploadsDir);
-  await fs.ensureDir(processedDir);
-  await fs.ensureDir(tempDir);
-  await fs.ensureDir(resourcesDir);
+  const directories = [uploadsDir, processedDir, tempDir, resourcesDir];
+  for (const dir of directories) {
+    await fs.ensureDir(dir);
+  }
 }
+
+// Call the function to ensure directories exist on file load
+ensureDirectoriesExist().then(() => {
+  console.log('All directories ensured.');
+}).catch((error) => {
+  console.error('Error ensuring directories:', error);
+});
 
 // Basic route to serve the login page
 app.get('/login', (req, res) => {
