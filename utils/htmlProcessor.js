@@ -68,7 +68,8 @@ async function processContent(filePath, dictionary) {
   // Sanitize HTML to remove unnecessary whitespace and ensure well-formedness
   const sanitizedBody = sanitizeHtml(body$.html(), {
     allowedTags: false, // Allow all tags
-    allowedAttributes: false // Allow all attributes
+    allowedAttributes: false, // Allow all attributes
+    allowVulnerableTags: true
   });
 
   // Reassemble the final HTML

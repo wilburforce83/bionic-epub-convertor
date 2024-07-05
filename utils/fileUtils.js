@@ -9,7 +9,7 @@ async function extractResources(epubPath, outputPath) {
   zip.extractAllTo(outputPath, true);
 }
 
-async function createEpub(resourcesPath, outputPath) {
+async function createEpub(resourcesPath, outputPath, uploadPath) {
   try {
     const output = fs.createWriteStream(outputPath);
     const archive = archiver('zip', {
@@ -22,7 +22,7 @@ async function createEpub(resourcesPath, outputPath) {
     });
 
     archive.on('error', (err) => {
-        throw err;
+      console.log('EPUB archiving error',err);
     });
 
     archive.pipe(output);
@@ -35,6 +35,9 @@ async function createEpub(resourcesPath, outputPath) {
 
     // Finalize the archive
     archive.finalize();
+
+    fs.unlinkSync(uploadPath);
+    //fs.emptyDir(resourcesPath);
 
     return { success: true, downloadUrl: `/processed/${path.basename(outputPath)}` };
   } catch (err) {

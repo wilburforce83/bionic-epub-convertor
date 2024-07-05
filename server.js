@@ -5,6 +5,7 @@ const express = require('express');
 const fileUpload = require('express-fileupload');
 const path = require('path');
 const fs = require('fs-extra');
+const chokidar = require('chokidar');
 const cron = require('node-cron');
 const { v2: webdav } = require('webdav-server');
 const session = require('express-session');
@@ -14,6 +15,7 @@ const { extractResources, createEpub } = require('./utils/fileUtils');
 const { processHtmlFiles } = require('./utils/htmlProcessor');
 const { extractEpubData, getEpubs } = require('./utils/epubDataUtils');
 const SimpleJsonDB = require('simple-json-db');
+const AdmZip = require('adm-zip');
 const app = express();
 const rootDir = __dirname;
 const uploadsDir = path.join(rootDir, 'uploads');
@@ -40,15 +42,15 @@ if (result.error) {
 // Initialize SimpleJsonDB for settings
 const db = new SimpleJsonDB(path.join('./db/db.json'));
 
-if (db.has('webdavPort')){
-webdavPort = db.get('webdavPort');
-console.log('using saved webdav port: ',webdavPort);
+if (db.has('webdavPort')) {
+  webdavPort = db.get('webdavPort');
+  console.log('using saved webdav port: ', webdavPort);
 }
 
-if (db.has('opdsPort')){
-  webdavPort = db.get('opds');
-  console.log('using saved port: ',PORT);
-  }
+if (db.has('opdsPort')) {
+  PORT = db.get('opdsPort');
+  console.log('using saved port: ', PORT);
+}
 
 // Use the OPDS server module
 const opdsApp = createOpdsServer(path.join(__dirname, 'processed'));
@@ -96,8 +98,8 @@ app.get('/login', (req, res) => {
 // Handle login
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
-  console.log('username :',username);
-  console.log('password :',password);
+  console.log('username :', username);
+  console.log('password :', password);
   if (username === webdavUsername && password === webdavPassword) {
     req.session.authenticated = true;
     res.redirect('/');
@@ -150,47 +152,116 @@ app.post('/update-database', isAuthenticated, async (req, res) => {
   }
 });
 
-// Route to upload and process EPUB file
+// Route to upload and process EPUB files
 app.post('/upload', isAuthenticated, async (req, res) => {
-  if (!req.files || !req.files.epubFile) {
-    return res.status(400).json({ success: false, message: 'No EPUB file was uploaded.' });
+  if (!req.files || !req.files.epubFiles) {
+    return res.status(400).json({ success: false, message: 'No EPUB files were uploaded.' });
   }
 
-  const epubFile = req.files.epubFile;
-  const uploadPath = path.join(uploadsDir, epubFile.name);
-  const processedPath = path.join(processedDir, `processed-${epubFile.name}`);
+  const epubFiles = Array.isArray(req.files.epubFiles) ? req.files.epubFiles : [req.files.epubFiles];
+
+  for (const epubFile of epubFiles) {
+    const uploadPath = path.join(uploadsDir, epubFile.name);
+
+    // Validate EPUB file
+    try {
+      const zip = new AdmZip(epubFile.data);
+      zip.getEntries(); // This will throw if the zip file is invalid
+    } catch (err) {
+      console.error('Invalid EPUB file:', err);
+      return res.status(400).json({ success: false, message: 'Invalid EPUB file.' });
+    }
+
+    // Add the file to the queue if it's not already there
+    if (!fileQueue.includes(uploadPath)) {
+      try {
+        // Save the uploaded file
+        await epubFile.mv(uploadPath);
+        fileQueue.push(uploadPath);
+      } catch (err) {
+        console.error('Error saving EPUB file:', err);
+        return res.status(500).json({ success: false, message: 'Error saving EPUB file.' });
+      }
+    }
+  }
+
+  if (!isProcessing) {
+    processNextFile();
+  }
+
+  res.json({ success: true, message: 'EPUB files uploaded successfully.' });
+});
+
+// Function to process EPUB file
+async function processEpubFile(epubPath) {
+  const processedPath = path.join(processedDir, `processed-${path.basename(epubPath)}`);
 
   try {
-    // Clear temp folder
-    await fs.emptyDir(resourcesDir);
+    console.log(`Starting to process EPUB file: ${epubPath}`);
 
     // Ensure directories exist
     await ensureDirectoriesExist();
 
-    // Save the uploaded file
-    await epubFile.mv(uploadPath);
+    // Clear temp folder
+    await fs.emptyDir(resourcesDir);
 
+    console.log(`Extracting resources from: ${epubPath}`);
     // Extract resources from the original EPUB
-    await extractResources(uploadPath, resourcesDir);
+    await extractResources(epubPath, resourcesDir);
 
     // Load the dictionary
+    console.log(`Loading dictionary from: ${dictionaryFilePath}`);
     const dictionary = await loadDictionary(dictionaryFilePath);
 
     // Process HTML files within the resources folder
+    console.log(`Processing HTML files in: ${resourcesDir}`);
     await processHtmlFiles(resourcesDir, dictionary);
 
     // Create new EPUB with processed content
-    const result = await createEpub(resourcesDir, processedPath);
+    console.log(`Creating new EPUB: ${processedPath}`);
+    const result = await createEpub(resourcesDir, processedPath, epubPath);
 
     if (result.success) {
+      console.log(`Successfully processed: ${epubPath}`);
       await extractEpubData(processedDir); // Update the EPUB data after processing
-      res.json({ success: true, downloadUrl: result.downloadUrl });
     } else {
-      res.status(500).json({ success: false, message: result.message });
+      console.error(`Error processing ${epubPath}: ${result.message}`);
     }
   } catch (err) {
-    console.error('Error processing EPUB:', err);
-    res.status(500).json({ success: false, message: 'Error processing EPUB file.' });
+    console.error(`Error processing EPUB: ${err.message}`, err);
+  } finally {
+      const index = fileQueue.indexOf(epubPath);
+    if (index > -1) {
+      fileQueue.splice(index, 1);
+    }
+
+    // Delay before processing the next file
+    setTimeout(processNextFile, 1000); // Adjust the delay as needed
+  }
+}
+
+const fileQueue = [];
+let isProcessing = false;
+
+// Process next file in the queue
+function processNextFile() {
+  if (fileQueue.length === 0) {
+    isProcessing = false;
+    return;
+  }
+  isProcessing = true;
+  const nextFile = fileQueue[0];
+  processEpubFile(nextFile);
+}
+
+// Watch for new files in the uploads directory
+chokidar.watch(uploadsDir).on('add', (filePath) => {
+  console.log(`File ${filePath} has been added`);
+  if (!fileQueue.includes(filePath)) {
+    fileQueue.push(filePath);
+    if (!isProcessing) {
+      processNextFile();
+    }
   }
 });
 

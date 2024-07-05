@@ -19,7 +19,7 @@ async function extractEpubData(processedDir) {
       const metaData = { filename: file };
 
       zipEntries.forEach(entry => {
-        if (entry.entryName.includes('cover') && (entry.entryName.endsWith('.jpg') || entry.entryName.endsWith('.jpeg') || entry.entryName.endsWith('.png'))) {
+        if (entry.entryName.includes('cover') && (entry.entryName.endsWith('.jpg') || entry.entryName.endsWith('.jpeg') || entry.entryName.endsWith('.png') || entry.entryName.endsWith('.gif')|| entry.entryName.endsWith('.svg'))) {
           const imgBuffer = zip.readFile(entry);
           const dimensions = sizeOf(imgBuffer);
           metaData.cover = `data:image/${dimensions.type};base64,${imgBuffer.toString('base64')}`;

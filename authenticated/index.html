@@ -11,7 +11,6 @@
     <style>
         .ui.container {
             margin-top: 100px;
-            /* Adjusted to avoid overlapping with the fixed header */
         }
 
         .ui.fixed.menu {
@@ -23,7 +22,6 @@
         .image-wrapper {
             width: 100%;
             padding-top: 100%;
-            /* 1:1 Aspect Ratio */
             position: relative;
             overflow: hidden;
         }
@@ -36,6 +34,18 @@
             height: 100%;
             object-fit: cover;
             object-position: top;
+        }
+
+        .drop-zone {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .drop-zone.dragover {
+            border-color: #333;
         }
     </style>
 </head>
@@ -73,17 +83,16 @@
     <div class="ui container">
         <div class="ui link cards" id="epubCards"></div>
     </div>
-    <div class="ui container">
-    </div>
 
     <div class="ui small modal" id="uploadModal">
         <div class="header">Upload EPUB</div>
         <div class="content">
             <form class="ui form" id="uploadForm" enctype="multipart/form-data">
                 <div class="field">
-                    <label>Select EPUB file</label>
-                    <input type="file" name="epubFile" accept=".epub">
+                    <label>Select EPUB files</label>
+                    <input type="file" name="epubFiles" id="epubFiles" accept=".epub" multiple>
                 </div>
+                <div class="drop-zone" id="dropZone">Drag and drop EPUB files here or click to select files</div>
                 <button class="ui button" type="submit">Convert and Add to Library</button>
             </form>
         </div>
@@ -120,7 +129,7 @@
         $(document).ready(function () {
             function loadEpubs() {
                 $.get('/epubs', function (data) {
-                    console.log('Loaded EPUB data:', data); // Debugging statement
+                    console.log('Loaded EPUB data:', data);
                     const epubCards = data.map(epub => `
                         <div class="card" data-filename="${epub.filename}">
                             <div class="image-wrapper">
@@ -135,7 +144,6 @@
                         </div>
                     `);
                     $('#epubCards').html(epubCards);
-                    // Add click event for each card
                     $('.card').on('click', function () {
                         const filename = $(this).data('filename');
                         window.location.href = `reader.html?file=${encodeURIComponent(filename)}`;
@@ -180,16 +188,44 @@
                         loadEpubs();
                     },
                     error: function () {
-                        alert('Error uploading file');
+                        alert('Error uploading files');
                     }
                 });
+            });
+
+            $('#dropZone').on('dragover', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                $(this).addClass('dragover');
+            });
+
+            $('#dropZone').on('dragleave', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                $(this).removeClass('dragover');
+            });
+
+            $('#dropZone').on('drop', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                $(this).removeClass('dragover');
+                const files = e.originalEvent.dataTransfer.files;
+                $('#epubFiles')[0].files = files;
+            });
+
+            $('#dropZone').on('click', function () {
+                $('#epubFiles').click();
+            });
+
+            $('#epubFiles').on('change', function () {
+                const files = $(this)[0].files;
+                $('#dropZone').text(files.length > 1 ? `${files.length} files selected` : files[0].name);
             });
 
             $('#searchBar').on('input', function () {
                 filterEpubs();
             });
 
-           
             $('#settingsButton').click(function () {
                 $.get('/settings', function (data) {
                     $('#settingsForm').find('input[name="webdavPort"]').val(data.webdavPort);
@@ -218,7 +254,6 @@
                     alert('Error restarting server');
                 });
             });
-
 
             loadEpubs();
         });
