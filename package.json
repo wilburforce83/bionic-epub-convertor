@@ -10,6 +10,7 @@
         "adm-zip": "^0.5.14",
         "body-parser": "^1.20.2",
         "cheerio": "^1.0.0-rc.12",
+        "chokidar": "^3.6.0",
         "dotenv": "^16.4.5",
         "epub": "^0.1.0",
         "epub-gen": "^0.1.0",
