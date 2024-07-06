@@ -28,11 +28,12 @@
 
     @media (max-width: 760px) {
       #viewer {
-        height: 93vh; /* Full viewport height */
+        height: 90vh; /* Full viewport height */
         width: 100vw;  /* Full viewport width */
       }
       #toc {
-        height: 7vh;
+        height: 0vh;
+        display: none !important;
       }
 
       .arrow {
@@ -72,7 +73,7 @@
       var isMobile = window.matchMedia("only screen and (max-width: 760px)").matches;
       var rendition = book.renderTo("viewer", {
         width: isMobile ? '100vw' : '100%',
-        height: isMobile ? '93vh' : 600,
+        height: isMobile ? '90vh' : 600,
         spread: isMobile ? "none" : "always"
       });
 
@@ -150,7 +151,7 @@
       window.addEventListener('resize', function() {
         var isMobileNow = window.matchMedia("only screen and (max-width: 760px)").matches;
         rendition.setSpread(isMobileNow ? "none" : "always");
-        rendition.resize(isMobileNow ? '100vw' : '100%', isMobileNow ? '93vh' : 600);
+        rendition.resize(isMobileNow ? '100vw' : '100%', isMobileNow ? '90vh' : 600);
       });
 
       book.loaded.navigation.then(function (toc) {
