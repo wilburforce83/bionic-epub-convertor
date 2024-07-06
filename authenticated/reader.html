@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,13 +10,23 @@
   <script src="epub.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap"
+    rel="stylesheet">
   <style>
-    body, html {
+    body,
+    html {
       margin: 0;
       padding: 0;
       height: 100%;
+      font-family: 'Roboto', sans-serif !important;
+      font-weight: 400;
       overflow: hidden;
+    }
+
+
+    strong,
+    b {
+      font-weight: bold !important;
     }
 
     #viewer {
@@ -28,9 +39,12 @@
 
     @media (max-width: 760px) {
       #viewer {
-        height: 90vh; /* Full viewport height */
-        width: 90vw;  /* Full viewport width */
+        height: 90vh;
+        /* Full viewport height */
+        width: 90vw;
+        /* Full viewport width */
       }
+
       #toc {
         height: 0vh;
         display: none !important;
@@ -52,6 +66,7 @@
     }
   </style>
 </head>
+
 <body>
   <select id="toc"></select>
   <div id="viewer" class="spreads"></div>
@@ -148,7 +163,7 @@
         });
       });
 
-      window.addEventListener('resize', function() {
+      window.addEventListener('resize', function () {
         var isMobileNow = window.matchMedia("only screen and (max-width: 760px)").matches;
         rendition.setSpread(isMobileNow ? "none" : "always");
         rendition.resize(isMobileNow ? '90vw' : '100%', isMobileNow ? '90vh' : 600);
@@ -176,4 +191,5 @@
     });
   </script>
 </body>
+
 </html>
