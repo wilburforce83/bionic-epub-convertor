@@ -15,42 +15,61 @@ async function extractEpubData(processedDir) {
   for (const file of epubFiles) {
     const filePath = path.join(processedDir, file);
     const fileStat = await fs.stat(filePath);
-
+  
     if (fileStat.isFile() && file.endsWith('.epub')) {
       try {
         const zip = new AdmZip(filePath);
         const zipEntries = zip.getEntries();
         const metaData = { filename: file };
-
+  
         let coverFound = false;
-
+        let largestSize = 0; // Initialize largestSize outside the loop to maintain its state across entries
+  
         zipEntries.forEach(entry => {
-          if (entry.entryName.includes('cover') && 
-              (entry.entryName.endsWith('.jpg') || entry.entryName.endsWith('.jpeg') || 
-               entry.entryName.endsWith('.png') || entry.entryName.endsWith('.gif') || 
-               entry.entryName.endsWith('.svg'))|| (entry.entryName.endsWith('.jpg') || entry.entryName.endsWith('.jpeg') || 
-               entry.entryName.endsWith('.png') || entry.entryName.endsWith('.gif') || 
-               entry.entryName.endsWith('.svg')) ) {
+          if (entry.entryName.includes('cover') &&
+            (entry.entryName.endsWith('.jpg') || entry.entryName.endsWith('.jpeg') ||
+              entry.entryName.endsWith('.png') || entry.entryName.endsWith('.gif') ||
+              entry.entryName.endsWith('.svg'))) {
             const imgBuffer = zip.readFile(entry);
             const dimensions = sizeOf(imgBuffer);
             metaData.cover = `data:image/${dimensions.type};base64,${imgBuffer.toString('base64')}`;
             coverFound = true;
+          } else if (entry.entryName.endsWith('.jpg') || entry.entryName.endsWith('.jpeg') ||
+            entry.entryName.endsWith('.png') || entry.entryName.endsWith('.gif') ||
+            entry.entryName.endsWith('.svg')) {
+            const imgBuffer = zip.readFile(entry);
+            const dimensions = sizeOf(imgBuffer);
+            const fileSize = imgBuffer.length;
+  
+            if (fileSize > largestSize) {
+              largestSize = fileSize;
+              metaData.cover = `data:image/${dimensions.type};base64,${imgBuffer.toString('base64')}`;
+              coverFound = true;
+            }
           }
-
-          if (entry.entryName.includes('content.opf')) {
+  
+          if (entry.entryName.includes('.opf')) {
             const content = zip.readAsText(entry);
             const titleMatch = content.match(/<dc:title>([^<]*)<\/dc:title>/);
             const authorMatch = content.match(/<dc:creator[^>]*>([^<]*)<\/dc:creator>/);
-
-            if (titleMatch) metaData.title = titleMatch[1];
-            if (authorMatch) metaData.author = authorMatch[1];
+  
+            if (titleMatch) {
+              metaData.title = titleMatch[1];
+            } else {
+              // Set the title as the file name without the .epub suffix
+              metaData.title = file.replace(/\.epub$/i, '');
+            }
+  
+            if (authorMatch) {
+              metaData.author = authorMatch[1];
+            }
           }
         });
-
+  
         if (!coverFound) {
           metaData.cover = `data:image/jpg;base64,${defaultBase64Image}`;
         }
-
+  
         epubData.push(metaData);
       } catch (error) {
         console.error(`Error processing file ${filePath}: ${error.message}`);
@@ -59,6 +78,7 @@ async function extractEpubData(processedDir) {
       }
     }
   }
+  
 
   await fs.writeJson(epubDataPath, epubData);
 }

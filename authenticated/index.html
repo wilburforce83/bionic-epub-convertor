@@ -319,6 +319,7 @@
             $('#uploadForm').submit(function (event) {
                 event.preventDefault();
                 const formData = new FormData(this);
+                console.log('upload triggered...')
                 $.ajax({
                     url: '/upload',
                     type: 'POST',
