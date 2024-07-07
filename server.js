@@ -16,10 +16,11 @@ const { processHtmlFiles } = require('./utils/htmlProcessor');
 const { extractEpubData, getEpubs } = require('./utils/epubDataUtils');
 const SimpleJsonDB = require('simple-json-db');
 const AdmZip = require('adm-zip');
+const xml = require('xmlbuilder');
 const app = express();
 const rootDir = __dirname;
-const uploadsDir = path.join(rootDir, 'uploads');
-const processedDir = path.join(rootDir, 'processed');
+var uploadsDir = path.join(rootDir, 'uploads');
+var processedDir = path.join(rootDir, 'processed');
 const tempDir = path.join(rootDir, 'temp');
 const resourcesDir = path.join(tempDir, 'resources');
 const dictionaryFilePath = path.join(rootDir, 'dictionary.txt');
@@ -28,7 +29,6 @@ var PORT = process.env.MAIN_PORT || 3000;
 const webdavUsername = process.env.WEBDAV_USERNAME || "dys";
 const webdavPassword = process.env.WEBDAV_PASSWORD || "password";
 console.log(webdavUsername, webdavPassword);
-const createOpdsServer = require('./opds/opdsServer');
 const { exec } = require('child_process');
 
 const result = dotenv.config();
@@ -47,14 +47,20 @@ if (db.has('webdavPort')) {
   console.log('using saved webdav port: ', webdavPort);
 }
 
+if (db.has('libraryPath')) {
+  processedDir = db.get('libraryPath');
+  console.log('using saved processed path: ', processedDir);
+}
+
+if (db.has('uploadPath')) {
+  uploadsDir = db.get('uploadPath');
+  console.log('using saved processed path: ', uploadsDir);
+}
+
 if (db.has('opdsPort')) {
   PORT = db.get('opdsPort');
   console.log('using saved port: ', PORT);
 }
-
-// Use the OPDS server module
-const opdsApp = createOpdsServer(path.join(__dirname, 'processed'));
-app.use('/opds', opdsApp);
 
 // Session middleware
 app.use(session({
@@ -356,3 +362,61 @@ webdavServer.setFileSystem('/processed', new webdav.PhysicalFileSystem(processed
 // Start the WebDAV server
 webdavServer.start(webdavPort);
 console.log(`WebDAV server is running on http://localhost:${webdavPort}`);
+
+
+///OPDS
+
+
+
+// Function to create OPDS feed
+function createOpdsFeed(epubs) {
+  const feed = xml.create({
+    feed: {
+      '@xmlns': 'http://www.w3.org/2005/Atom',
+      '@xmlns:dc': 'http://purl.org/dc/terms/',
+      '@xmlns:opds': 'http://opds-spec.org/2010/catalog',
+      title: { '#text': 'My eBook Library' },
+      id: { '#text': `urn:uuid:${uuid.v4()}` },
+      updated: { '#text': new Date().toISOString() },
+      author: {
+        name: { '#text': 'Your Library Name' }
+      },
+      link: [
+        { '@rel': 'self', '@href': 'http://localhost:' + PORT + '/opds', '@type': 'application/atom+xml;profile=opds-catalog;kind=navigation' },
+        { '@rel': 'start', '@href': 'http://localhost:' + PORT + '/opds', '@type': 'application/atom+xml;profile=opds-catalog;kind=navigation' }
+      ]
+    }
+  });
+
+  const entries = epubs.map(epub => {
+    return {
+      entry: {
+        title: { '#text': epub.title },
+        id: { '#text': `urn:uuid:${uuid.v4()}` },
+        updated: { '#text': new Date(epub.lastModified).toISOString() },
+        content: { '@type': 'text', '#text': `Available: ${epub.filename}` },
+        link: {
+          '@rel': 'http://opds-spec.org/acquisition',
+          '@href': `http://localhost:${PORT}/epub/${encodeURIComponent(epub.filename)}`,
+          '@type': 'application/epub+zip'
+        }
+      }
+    };
+  });
+
+  feed.ele(entries);
+  return feed.end({ pretty: true });
+}
+
+// OPDS route
+app.get('/opds', async (req, res) => {
+  try {
+    const epubs = await getEpubs(); // Reuse your existing function to get the list of EPUBs
+    const feed = createOpdsFeed(epubs);
+    res.type('application/xml').send(feed);
+  } catch (err) {
+    console.error('Error generating OPDS feed:', err);
+    res.status(500).send('Failed to generate OPDS feed');
+  }
+});
+
