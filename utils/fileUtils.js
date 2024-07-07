@@ -1,8 +1,7 @@
 const fs = require('fs-extra');
 const path = require('path');
 const AdmZip = require('adm-zip');
-const archiver = require('archiver');
-const xmlbuilder = require('xmlbuilder');
+const JSZip = require('jszip');
 
 async function extractResources(epubPath, outputPath) {
   const zip = new AdmZip(epubPath);
@@ -11,33 +10,48 @@ async function extractResources(epubPath, outputPath) {
 
 async function createEpub(resourcesPath, outputPath, uploadPath) {
   try {
-    const output = fs.createWriteStream(outputPath);
-    const archive = archiver('zip', {
-        zlib: { level: 9 }
+    const zip = new JSZip();
+
+    // Add the mimetype file (must be first and uncompressed)
+    zip.file('mimetype', 'application/epub+zip', { compression: "STORE" });
+
+    // Recursively add files and directories to the zip archive
+    async function addFilesFromDirectory(directory, parentZipFolder = '') {
+      const items = await fs.readdir(directory, { withFileTypes: true });
+      for (const item of items) {
+        const itemPath = path.join(directory, item.name);
+        if (item.isDirectory()) {
+          // Recursively handle directories
+          const dirZipPath = path.join(parentZipFolder, item.name);
+          await addFilesFromDirectory(itemPath, dirZipPath);
+        } else {
+          // Read file and add to zip
+          const fileData = await fs.readFile(itemPath);
+          zip.file(path.join(parentZipFolder, item.name), fileData, { binary: true });
+        }
+      }
+    }
+
+    // Start adding files from the resources directory
+    await addFilesFromDirectory(resourcesPath);
+
+    // Generate zip content as a Buffer
+    const buffer = await zip.generateAsync({
+      type: "nodebuffer",
+      compression: "DEFLATE",
+      compressionOptions: {
+          level: 9
+      }
     });
 
-    output.on('close', () => {
-        console.log(`${archive.pointer()} total bytes`);
-        console.log('EPUB file has been created successfully.');
-    });
+    // Write the Buffer to the output path
+    await fs.writeFile(outputPath, buffer);
 
-    archive.on('error', (err) => {
-      console.log('EPUB archiving error',err);
-    });
+    // Cleanup the upload path
+    await fs.unlink(uploadPath);
 
-    archive.pipe(output);
-
-    // Add mimetype file (uncompressed)
-    archive.append('application/epub+zip', { name: 'mimetype', store: true });
-
-    // Add the rest of the files
-    archive.directory(resourcesPath, false);
-
-    // Finalize the archive
-    archive.finalize();
-
-    fs.unlinkSync(uploadPath);
-    //fs.emptyDir(resourcesPath);
+    console.log(`${buffer.length} total bytes`);
+    console.log('EPUB file has been created successfully.');
 
     return { success: true, downloadUrl: `/processed/${path.basename(outputPath)}` };
   } catch (err) {
@@ -45,6 +59,7 @@ async function createEpub(resourcesPath, outputPath, uploadPath) {
     return { success: false, message: 'Error creating EPUB file.' };
   }
 }
+
 
 module.exports = {
   extractResources,

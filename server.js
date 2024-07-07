@@ -198,7 +198,15 @@ app.post('/upload', isAuthenticated, async (req, res) => {
 });
 
 // Function to process EPUB file
-async function processEpubFile(epubPath) {
+async function processEpubFile() {
+  if (fileQueue.length === 0) {
+    isProcessing = false;
+    return;
+  }
+
+  isProcessing = true;
+  const epubPath = fileQueue.shift(); // Dequeue the next file to process
+
   const processedPath = path.join(processedDir, `${path.basename(epubPath)}`);
 
   try {
@@ -243,12 +251,6 @@ async function processEpubFile(epubPath) {
       console.error('Error deleting EPUB file:', err);
     }
 
-    // Remove the file from the queue
-    const index = fileQueue.indexOf(epubPath);
-    if (index > -1) {
-      fileQueue.splice(index, 1);
-    }
-
     // Delay before processing the next file
     setTimeout(processNextFile, 1000); // Adjust the delay as needed
   }
@@ -268,10 +270,10 @@ function processNextFile() {
   processEpubFile(nextFile);
 }
 
-// Watch for new files in the uploads directory
+/// Watch for new files in the uploads directory
 chokidar.watch(uploadsDir).on('add', (filePath) => {
   console.log(`File ${filePath} has been added`);
-  if (!fileQueue.includes(filePath)) {
+  if (!fileQueue.includes(filePath) && fs.existsSync(filePath)) {
     fileQueue.push(filePath);
     if (!isProcessing) {
       processNextFile();
