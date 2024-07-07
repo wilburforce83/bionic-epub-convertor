@@ -421,10 +421,11 @@ app.get('/opds', async (req, res) => {
   try {
     const epubs = await getEpubs(); // Reuse your existing function to get the list of EPUBs
     const feed = createOpdsFeed(epubs);
-    res.type('application/xml').send(feed);
+    res.type('application/atom+xml').send(feed);
   } catch (err) {
     console.error('Error generating OPDS feed:', err);
     res.status(500).send('Failed to generate OPDS feed');
   }
 });
+
 
