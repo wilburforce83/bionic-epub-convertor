@@ -30,9 +30,9 @@
     }
 
     #toc {
-        height: 0vh;
-        display: none !important;
-      }
+      height: 0vh;
+      display: none !important;
+    }
 
     #viewer {
       width: 100%;
@@ -41,6 +41,26 @@
       top: 0;
       left: 0;
     }
+
+    .back-button {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 1000;
+      background-color: black;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      padding: 10px 20px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    .back-button:hover {
+      background-color: #333;
+      /* Darker shade for hover effect */
+    }
+
 
     @media (max-width: 760px) {
       #viewer {
@@ -55,6 +75,9 @@
         display: none !important;
       }
 
+      .back-button {
+        display: none !important;
+      }
       .arrow {
         position: fixed;
         top: 50%;
@@ -74,11 +97,18 @@
 
 <body>
   <select id="toc"></select>
+  <button id="backButton" class="back-button">Back</button>
+
   <div id="viewer" class="spreads"></div>
   <a id="prev" href="#prev" class="arrow">‹</a>
   <a id="next" href="#next" class="arrow">›</a>
 
   <script>
+
+    document.getElementById("backButton").addEventListener("click", function () {
+      window.history.back();
+    });
+
     document.addEventListener("DOMContentLoaded", function () {
       var params = URLSearchParams && new URLSearchParams(document.location.search.substring(1));
       var url = params && params.get("file") && decodeURIComponent(params.get("file"));

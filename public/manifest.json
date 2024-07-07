@@ -13,10 +13,11 @@
         "sizes": "512x512"
       }
     ],
-    "start_url": "/",
+    "start_url": "/login",
     "background_color": "#FFFFFF",
-    "display": "standalone",
+    "display": "fullscreen",
     "scope": "/",
-    "theme_color": "#317EFB"
+    "theme_color": "#202021",
+    "orientation": "portrait"
   }
   

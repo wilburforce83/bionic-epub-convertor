@@ -3,10 +3,9 @@ self.addEventListener('install', function(event) {
       caches.open('dyslibria-cache-v1').then(function(cache) {
         return cache.addAll([
           '/',
-          '/public/login.html',
-          '/public/styles.css',
-          '/public/icons/icon-192x192.png',
-          '/public/icons/icon-512x512.png'
+          'login.html',
+          'icons/icon-192x192.png',
+          'icons/icon-512x512.png'
         ]);
       })
     );
