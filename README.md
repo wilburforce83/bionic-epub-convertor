@@ -43,6 +43,7 @@ Before you start, ensure you have Node.js and npm installed on your system. You 
    WEBDAV_PORT=1900
    WEBDAV_USERNAME=dys
    WEBDAV_PASSWORD=password
+   BASE_URL=yoururlandport // use this for external access to opds if you are port forwarding 
    ```
 
 4. **Start the application:**

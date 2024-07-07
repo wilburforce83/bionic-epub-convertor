@@ -23,6 +23,7 @@
         "node-cron": "^3.0.3",
         "sanitize-html": "^2.13.0",
         "simple-json-db": "^2.0.0",
+        "uuid": "^10.0.0",
         "webdav": "^5.6.0",
         "webdav-server": "^2.6.2",
         "xmlbuilder": "^15.1.1"
