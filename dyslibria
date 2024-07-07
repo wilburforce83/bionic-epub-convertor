@@ -254,3 +254,195 @@ Require stack:
   code: 'MODULE_NOT_FOUND',
   requireStack: [ '/home/wilbur/bionic-epub-convertor/server.js' ]
 }
+Dotenv config error: Error: ENOENT: no such file or directory, open '/home/wilbur/bionic-epub-convertor/.env'
+    at Object.openSync (node:fs:590:3)
+    at Object.readFileSync (node:fs:458:35)
+    at Object.configDotenv (/home/wilbur/bionic-epub-convertor/node_modules/dotenv/lib/main.js:237:44)
+    at Object.config (/home/wilbur/bionic-epub-convertor/node_modules/dotenv/lib/main.js:266:25)
+    at Object.<anonymous> (/home/wilbur/bionic-epub-convertor/server.js:34:23)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1252:10)
+    at Module.load (node:internal/modules/cjs/loader:1076:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:911:12)
+    at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23) {
+  errno: -2,
+  syscall: 'open',
+  code: 'ENOENT',
+  path: '/home/wilbur/bionic-epub-convertor/.env'
+}
+Error: listen EADDRINUSE: address already in use :::3000
+    at Server.setupListenHandle [as _listen2] (node:net:1463:16)
+    at listenInCluster (node:net:1511:12)
+    at Server.listen (node:net:1599:7)
+    at Function.listen (/home/wilbur/bionic-epub-convertor/node_modules/express/lib/application.js:635:24)
+    at Object.<anonymous> (/home/wilbur/bionic-epub-convertor/server.js:328:5)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1252:10)
+    at Module.load (node:internal/modules/cjs/loader:1076:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:911:12)
+    at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23) {
+  code: 'EADDRINUSE',
+  errno: -98,
+  syscall: 'listen',
+  address: '::',
+  port: 3000
+}
+Dotenv config error: Error: ENOENT: no such file or directory, open '/home/wilbur/bionic-epub-convertor/.env'
+    at Object.openSync (node:fs:590:3)
+    at Object.readFileSync (node:fs:458:35)
+    at Object.configDotenv (/home/wilbur/bionic-epub-convertor/node_modules/dotenv/lib/main.js:237:44)
+    at Object.config (/home/wilbur/bionic-epub-convertor/node_modules/dotenv/lib/main.js:266:25)
+    at Object.<anonymous> (/home/wilbur/bionic-epub-convertor/server.js:34:23)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1252:10)
+    at Module.load (node:internal/modules/cjs/loader:1076:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:911:12)
+    at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23) {
+  errno: -2,
+  syscall: 'open',
+  code: 'ENOENT',
+  path: '/home/wilbur/bionic-epub-convertor/.env'
+}
+Error processing EPUB: Invalid filename Error: Invalid filename
+    at new module.exports (/home/wilbur/bionic-epub-convertor/node_modules/adm-zip/adm-zip.js:57:19)
+    at extractResources (/home/wilbur/bionic-epub-convertor/utils/fileUtils.js:8:15)
+    at processEpubFile (/home/wilbur/bionic-epub-convertor/server.js:210:11)
+Error processing file /home/wilbur/bionic-epub-convertor/processed/processed-Alastair Reynolds - [Revelation Space 01] - Revelation Space.epub: Invalid or unsupported zip format. No END header found
+Error processing EPUB: Invalid filename Error: Invalid filename
+    at new module.exports (/home/wilbur/bionic-epub-convertor/node_modules/adm-zip/adm-zip.js:57:19)
+    at extractResources (/home/wilbur/bionic-epub-convertor/utils/fileUtils.js:8:15)
+    at processEpubFile (/home/wilbur/bionic-epub-convertor/server.js:210:11)
+Error processing file /home/wilbur/bionic-epub-convertor/processed/processed-Alastair Reynolds - [Revelation Space 02] - Chasm City.epub: Invalid or unsupported zip format. No END header found
+Error processing file /home/wilbur/bionic-epub-convertor/processed/processed-Alastair Reynolds - [Revelation Space 03] - Redemption Ark.epub: Invalid or unsupported zip format. No END header found
+Error processing file /home/wilbur/bionic-epub-convertor/processed/processed-Alastair Reynolds - [Revelation Space 05] - Absolution Gap.epub: Invalid or unsupported zip format. No END header found
+Error creating EPUB: Error: ENOENT: no such file or directory, unlink '/home/wilbur/bionic-epub-convertor/uploads/Alastair Reynolds - [Revelation Space 07] - The Prefect.epub'
+    at Object.unlinkSync (node:fs:1767:3)
+    at createEpub (/home/wilbur/bionic-epub-convertor/utils/fileUtils.js:39:8)
+    at processEpubFile (/home/wilbur/bionic-epub-convertor/server.js:222:26) {
+  errno: -2,
+  syscall: 'unlink',
+  code: 'ENOENT',
+  path: '/home/wilbur/bionic-epub-convertor/uploads/Alastair Reynolds - [Revelation Space 07] - The Prefect.epub'
+}
+Error processing /home/wilbur/bionic-epub-convertor/uploads/Alastair Reynolds - [Revelation Space 07] - The Prefect.epub: Error creating EPUB file.
+Error processing EPUB: Invalid filename Error: Invalid filename
+    at new module.exports (/home/wilbur/bionic-epub-convertor/node_modules/adm-zip/adm-zip.js:57:19)
+    at extractResources (/home/wilbur/bionic-epub-convertor/utils/fileUtils.js:8:15)
+    at processEpubFile (/home/wilbur/bionic-epub-convertor/server.js:210:11)
+Error processing EPUB: Invalid filename Error: Invalid filename
+    at new module.exports (/home/wilbur/bionic-epub-convertor/node_modules/adm-zip/adm-zip.js:57:19)
+    at extractResources (/home/wilbur/bionic-epub-convertor/utils/fileUtils.js:8:15)
+    at processEpubFile (/home/wilbur/bionic-epub-convertor/server.js:210:11)
+Error processing file /home/wilbur/bionic-epub-convertor/processed/processed-Alastair Reynolds - [Revelation Space 07] - The Prefect.epub: Invalid or unsupported zip format. No END header found
+Error processing EPUB: Invalid filename Error: Invalid filename
+    at new module.exports (/home/wilbur/bionic-epub-convertor/node_modules/adm-zip/adm-zip.js:57:19)
+    at extractResources (/home/wilbur/bionic-epub-convertor/utils/fileUtils.js:8:15)
+    at processEpubFile (/home/wilbur/bionic-epub-convertor/server.js:210:11)
+Error processing EPUB: Invalid filename Error: Invalid filename
+    at new module.exports (/home/wilbur/bionic-epub-convertor/node_modules/adm-zip/adm-zip.js:57:19)
+    at extractResources (/home/wilbur/bionic-epub-convertor/utils/fileUtils.js:8:15)
+    at processEpubFile (/home/wilbur/bionic-epub-convertor/server.js:210:11)
+Error processing EPUB: Invalid filename Error: Invalid filename
+    at new module.exports (/home/wilbur/bionic-epub-convertor/node_modules/adm-zip/adm-zip.js:57:19)
+    at extractResources (/home/wilbur/bionic-epub-convertor/utils/fileUtils.js:8:15)
+    at processEpubFile (/home/wilbur/bionic-epub-convertor/server.js:210:11)
+Error processing EPUB: Invalid filename Error: Invalid filename
+    at new module.exports (/home/wilbur/bionic-epub-convertor/node_modules/adm-zip/adm-zip.js:57:19)
+    at extractResources (/home/wilbur/bionic-epub-convertor/utils/fileUtils.js:8:15)
+    at processEpubFile (/home/wilbur/bionic-epub-convertor/server.js:210:11)
+Error processing EPUB: Invalid filename Error: Invalid filename
+    at new module.exports (/home/wilbur/bionic-epub-convertor/node_modules/adm-zip/adm-zip.js:57:19)
+    at extractResources (/home/wilbur/bionic-epub-convertor/utils/fileUtils.js:8:15)
+    at processEpubFile (/home/wilbur/bionic-epub-convertor/server.js:210:11)
+Error processing EPUB: Invalid filename Error: Invalid filename
+    at new module.exports (/home/wilbur/bionic-epub-convertor/node_modules/adm-zip/adm-zip.js:57:19)
+    at extractResources (/home/wilbur/bionic-epub-convertor/utils/fileUtils.js:8:15)
+    at processEpubFile (/home/wilbur/bionic-epub-convertor/server.js:210:11)
+Error processing file /home/wilbur/bionic-epub-convertor/processed/processed-Alastair Reynolds - [Revelation Space 01] - Revelation Space.epub: Invalid or unsupported zip format. No END header found
+Error processing EPUB: Invalid filename Error: Invalid filename
+    at new module.exports (/home/wilbur/bionic-epub-convertor/node_modules/adm-zip/adm-zip.js:57:19)
+    at extractResources (/home/wilbur/bionic-epub-convertor/utils/fileUtils.js:8:15)
+    at processEpubFile (/home/wilbur/bionic-epub-convertor/server.js:210:11)
+Error processing file /home/wilbur/bionic-epub-convertor/processed/processed-Alastair Reynolds - [Revelation Space 02] - Chasm City.epub: Invalid or unsupported zip format. No END header found
+Error processing EPUB: Invalid filename Error: Invalid filename
+    at new module.exports (/home/wilbur/bionic-epub-convertor/node_modules/adm-zip/adm-zip.js:57:19)
+    at extractResources (/home/wilbur/bionic-epub-convertor/utils/fileUtils.js:8:15)
+    at processEpubFile (/home/wilbur/bionic-epub-convertor/server.js:210:11)
+Error processing file /home/wilbur/bionic-epub-convertor/processed/processed-Alastair Reynolds - [Revelation Space 03] - Redemption Ark.epub: Invalid or unsupported zip format. No END header found
+Error processing file /home/wilbur/bionic-epub-convertor/processed/processed-Alastair Reynolds - [Revelation Space 05] - Absolution Gap.epub: Invalid or unsupported zip format. No END header found
+Error processing file /home/wilbur/bionic-epub-convertor/processed/processed-Alastair Reynolds - [Revelation Space 06] - Galactic North (v5.0) (epub).epub: Invalid or unsupported zip format. No END header found
+Error processing EPUB: Invalid filename Error: Invalid filename
+    at new module.exports (/home/wilbur/bionic-epub-convertor/node_modules/adm-zip/adm-zip.js:57:19)
+    at extractResources (/home/wilbur/bionic-epub-convertor/utils/fileUtils.js:8:15)
+    at processEpubFile (/home/wilbur/bionic-epub-convertor/server.js:210:11)
+Error processing file /home/wilbur/bionic-epub-convertor/processed/processed-Alastair Reynolds - [Revelation Space 07] - The Prefect.epub: Invalid or unsupported zip format. No END header found
+Error processing EPUB: Invalid filename Error: Invalid filename
+    at new module.exports (/home/wilbur/bionic-epub-convertor/node_modules/adm-zip/adm-zip.js:57:19)
+    at extractResources (/home/wilbur/bionic-epub-convertor/utils/fileUtils.js:8:15)
+    at processEpubFile (/home/wilbur/bionic-epub-convertor/server.js:210:11)
+Error processing file /home/wilbur/bionic-epub-convertor/processed/processed-Alastair Reynolds - [Revelation Space 08] - Elysium Fire.epub: Invalid or unsupported zip format. No END header found
+Error processing EPUB: Invalid filename Error: Invalid filename
+    at new module.exports (/home/wilbur/bionic-epub-convertor/node_modules/adm-zip/adm-zip.js:57:19)
+    at extractResources (/home/wilbur/bionic-epub-convertor/utils/fileUtils.js:8:15)
+    at processEpubFile (/home/wilbur/bionic-epub-convertor/server.js:210:11)
+Error processing file /home/wilbur/bionic-epub-convertor/processed/processed-Alastair Reynolds - [Revelation Space] - The Revelation Space Collection.epub: Invalid or unsupported zip format. No END header found
+Error fetching EPUBs: TypeError: Cannot read properties of undefined (reading 'localeCompare')
+    at /home/wilbur/bionic-epub-convertor/server.js:125:35
+    at Array.sort (<anonymous>)
+    at /home/wilbur/bionic-epub-convertor/server.js:125:11
+Error fetching EPUBs: TypeError: Cannot read properties of undefined (reading 'localeCompare')
+    at /home/wilbur/bionic-epub-convertor/server.js:125:35
+    at Array.sort (<anonymous>)
+    at /home/wilbur/bionic-epub-convertor/server.js:125:11
+Error fetching EPUBs: TypeError: Cannot read properties of undefined (reading 'localeCompare')
+    at /home/wilbur/bionic-epub-convertor/server.js:125:35
+    at Array.sort (<anonymous>)
+    at /home/wilbur/bionic-epub-convertor/server.js:125:11
+Error fetching EPUBs: TypeError: Cannot read properties of undefined (reading 'localeCompare')
+    at /home/wilbur/bionic-epub-convertor/server.js:125:35
+    at Array.sort (<anonymous>)
+    at /home/wilbur/bionic-epub-convertor/server.js:125:11
+Error fetching EPUBs: TypeError: Cannot read properties of undefined (reading 'localeCompare')
+    at /home/wilbur/bionic-epub-convertor/server.js:125:35
+    at Array.sort (<anonymous>)
+    at /home/wilbur/bionic-epub-convertor/server.js:125:11
+Error fetching EPUBs: TypeError: Cannot read properties of undefined (reading 'localeCompare')
+    at /home/wilbur/bionic-epub-convertor/server.js:125:35
+    at Array.sort (<anonymous>)
+    at /home/wilbur/bionic-epub-convertor/server.js:125:11
+Error fetching EPUBs: TypeError: Cannot read properties of undefined (reading 'localeCompare')
+    at /home/wilbur/bionic-epub-convertor/server.js:125:35
+    at Array.sort (<anonymous>)
+    at /home/wilbur/bionic-epub-convertor/server.js:125:11
+Dotenv config error: Error: ENOENT: no such file or directory, open '/home/wilbur/bionic-epub-convertor/.env'
+    at Object.openSync (node:fs:590:3)
+    at Object.readFileSync (node:fs:458:35)
+    at Object.configDotenv (/home/wilbur/bionic-epub-convertor/node_modules/dotenv/lib/main.js:237:44)
+    at Object.config (/home/wilbur/bionic-epub-convertor/node_modules/dotenv/lib/main.js:266:25)
+    at Object.<anonymous> (/home/wilbur/bionic-epub-convertor/server.js:34:23)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1252:10)
+    at Module.load (node:internal/modules/cjs/loader:1076:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:911:12)
+    at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23) {
+  errno: -2,
+  syscall: 'open',
+  code: 'ENOENT',
+  path: '/home/wilbur/bionic-epub-convertor/.env'
+}
+Dotenv config error: Error: ENOENT: no such file or directory, open '/home/wilbur/bionic-epub-convertor/.env'
+    at Object.openSync (node:fs:590:3)
+    at Object.readFileSync (node:fs:458:35)
+    at Object.configDotenv (/home/wilbur/bionic-epub-convertor/node_modules/dotenv/lib/main.js:237:44)
+    at Object.config (/home/wilbur/bionic-epub-convertor/node_modules/dotenv/lib/main.js:266:25)
+    at Object.<anonymous> (/home/wilbur/bionic-epub-convertor/server.js:34:23)
+    at Module._compile (node:internal/modules/cjs/loader:1198:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1252:10)
+    at Module.load (node:internal/modules/cjs/loader:1076:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:911:12)
+    at Object.<anonymous> (/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js:33:23) {
+  errno: -2,
+  syscall: 'open',
+  code: 'ENOENT',
+  path: '/home/wilbur/bionic-epub-convertor/.env'
+}

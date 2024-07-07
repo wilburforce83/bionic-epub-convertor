@@ -29,6 +29,11 @@
       font-weight: bold !important;
     }
 
+    #toc {
+        height: 0vh;
+        display: none !important;
+      }
+
     #viewer {
       width: 100%;
       height: 100%;
@@ -91,28 +96,45 @@
         height: isMobile ? '90vh' : 600,
         spread: isMobile ? "none" : "always"
       });
-/*
-      rendition.themes.default({
-        'h1': {
-          'font-family': "'Quicksand', sans-serif",
-          'font-weight': '700'
-        },
-        'h2': {
-          'font-family': "'Quicksand', sans-serif",
-          'font-weight': '600'
-        },
-        'p': {
-          'font-family': "'Quicksand', sans-serif !important;",
-          'font-weight': '400 !important;',
-          'font-size': '0.9em !important;'
-        },
-        'b': {
-          'font-family': "'Quicksand', sans-serif !important;",
-          'font-weight': '600 !important;',
-          'font-size': '0.95em !important;'
+
+      // This function checks the viewport width and adds or removes the class accordingly
+      function checkViewport() {
+        const viewer = document.getElementById('viewer');
+        if (window.innerWidth <= 760) {
+          viewer.classList.remove('spreads');
+        } else {
+          viewer.classList.add('spreads');
         }
-      });
-      */
+      }
+
+      // Attach the function to the window resize event
+      window.addEventListener('resize', checkViewport);
+
+      // Call the function on initial load
+      checkViewport();
+
+      /*
+            rendition.themes.default({
+              'h1': {
+                'font-family': "'Quicksand', sans-serif",
+                'font-weight': '700'
+              },
+              'h2': {
+                'font-family': "'Quicksand', sans-serif",
+                'font-weight': '600'
+              },
+              'p': {
+                'font-family': "'Quicksand', sans-serif !important;",
+                'font-weight': '400 !important;',
+                'font-size': '0.9em !important;'
+              },
+              'b': {
+                'font-family': "'Quicksand', sans-serif !important;",
+                'font-weight': '600 !important;',
+                'font-size': '0.95em !important;'
+              }
+            });
+            */
 
       function saveReadingPosition(book, location) {
         var bookInfo = {

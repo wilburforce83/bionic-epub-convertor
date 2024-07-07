@@ -121,14 +121,19 @@ app.use('/epub', express.static(processedDir));
 app.get('/epubs', async (req, res) => {
   try {
     const epubs = await getEpubs();
-    // Sort epubs by author name alphabetically
-    epubs.sort((a, b) => a.author.localeCompare(b.author));
+    // Sort epubs by author name alphabetically, ensuring no undefined values
+    epubs.sort((a, b) => {
+      const authorA = a.author || ''; // Default to empty string if undefined
+      const authorB = b.author || ''; // Default to empty string if undefined
+      return authorA.localeCompare(authorB);
+    });
     res.json(epubs);
   } catch (err) {
     console.error('Error fetching EPUBs:', err);
     res.status(500).json({ success: false, message: 'Error fetching EPUBs.' });
   }
 });
+
 
 // Route to serve EPUB files
 app.get('/epub/:filename', (req, res) => {
@@ -194,7 +199,7 @@ app.post('/upload', isAuthenticated, async (req, res) => {
 
 // Function to process EPUB file
 async function processEpubFile(epubPath) {
-  const processedPath = path.join(processedDir, `processed-${path.basename(epubPath)}`);
+  const processedPath = path.join(processedDir, `${path.basename(epubPath)}`);
 
   try {
     console.log(`Starting to process EPUB file: ${epubPath}`);
