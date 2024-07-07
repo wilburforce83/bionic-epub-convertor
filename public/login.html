@@ -6,20 +6,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css">
+  <link rel="manifest" href="/public/manifest.json">
+  <meta name="theme-color" content="#317EFB">
+
   <style>
-    body, html {
+    body,
+    html {
       height: 100%;
       margin: 0;
       display: flex;
       justify-content: center;
       align-items: center;
     }
+
     .centered-container {
       display: flex;
       justify-content: center;
       align-items: center;
       height: 100%;
     }
+
     .ui.container {
       max-width: 400px;
     }
@@ -29,7 +35,7 @@
 <body>
   <div class="centered-container">
     <div class="ui container">
-      
+
       <div class="ui center aligned padded segment">
         <h2 class="ui center aligned icon header">
           <i class="book icon"></i>
@@ -44,11 +50,25 @@
             <label><span style="font-weight: 300;"><span style="font-weight: 600;">Pass</span>word</span></label>
             <input type="password" name="password" placeholder="Password" required>
           </div>
-          <button class="ui button" type="submit"><span style="font-weight: 300;"><span style="font-weight: 600;">Log</span>in</span></button>
+          <button class="ui button" type="submit"><span style="font-weight: 300;"><span
+                style="font-weight: 600;">Log</span>in</span></button>
         </form>
       </div>
     </div>
   </div>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/public/sw.js')
+        .then(function(registration) {
+          console.log('Service Worker registered with scope:', registration.scope);
+        })
+        .catch(function(error) {
+          console.log('Service Worker registration failed:', error);
+        });
+    }
+  </script>
+  
 </body>
 
 </html>
