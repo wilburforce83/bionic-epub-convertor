@@ -371,50 +371,44 @@ console.log(`WebDAV server is running on http://localhost:${webdavPort}`);
 
 
 
-
-
 function createOpdsFeed(epubs) {
-  const feed = xml.create({
-    feed: {
-      '@xmlns': 'http://www.w3.org/2005/Atom',
-      '@xmlns:dc': 'http://purl.org/dc/terms/',
-      '@xmlns:opds': 'http://opds-spec.org/2010/catalog',
-      title: { '#text': 'My eBook Library' },
-      id: { '#text': `urn:uuid:${uuidv4()}` },
-      updated: { '#text': new Date().toISOString() },
-      author: {
-        name: { '#text': 'Your Library Name' }
-      },
-      link: [
-        { '@rel': 'self', '@href': `${BASE_URL}/opds`, '@type': 'application/atom+xml;profile=opds-catalog;kind=navigation' },
-        { '@rel': 'start', '@href': `${BASE_URL}/opds`, '@type': 'application/atom+xml;profile=opds-catalog;kind=navigation' }
-      ]
-    }
-  });
+  const feed = xml.create('feed', { encoding: 'UTF-8' })
+    .att('xmlns', 'http://www.w3.org/2005/Atom')
+    .att('xmlns:dc', 'http://purl.org/dc/terms/')
+    .att('xmlns:opds', 'http://opds-spec.org/2010/catalog')
+    .ele('title', 'My eBook Library').up()
+    .ele('id', `urn:uuid:${uuidv4()}`).up()
+    .ele('updated', new Date().toISOString()).up()
+    .ele('author')
+      .ele('name', 'Your Library Name').up()
+    .up()
+    .ele('link')
+      .att('rel', 'self')
+      .att('href', `${BASE_URL}/opds`)
+      .att('type', 'application/atom+xml;profile=opds-catalog;kind=navigation').up()
+    .ele('link')
+      .att('rel', 'start')
+      .att('href', `${BASE_URL}/opds`)
+      .att('type', 'application/atom+xml;profile=opds-catalog;kind=navigation').up();
 
-  const entries = epubs.map(epub => {
+  epubs.forEach(epub => {
     const lastModified = new Date(epub.lastModified);
     const validLastModified = isNaN(lastModified.getTime()) ? new Date() : lastModified;
 
-    return {
-      entry: {
-        title: { '#text': epub.title },
-        id: { '#text': `urn:uuid:${uuidv4()}` },
-        updated: { '#text': validLastModified.toISOString() },
-        content: { '@type': 'text', '#text': `Available: ${epub.filename}` },
-        link: {
-          '@rel': 'http://opds-spec.org/acquisition',
-          '@href': `${BASE_URL}/epub/${encodeURIComponent(epub.filename)}`,
-          '@type': 'application/epub+zip'
-        }
-      }
-    };
+    feed.ele('entry')
+      .ele('title', epub.title).up()
+      .ele('id', `urn:uuid:${uuidv4()}`).up()
+      .ele('updated', validLastModified.toISOString()).up()
+      .ele('content', { type: 'text' }, `Available: ${epub.filename}`).up()
+      .ele('link')
+        .att('rel', 'http://opds-spec.org/acquisition/open-access')
+        .att('href', `${BASE_URL}/epub/${encodeURIComponent(epub.filename)}`)
+        .att('type', 'application/epub+zip').up()
+      .up();
   });
 
-  feed.ele(entries);
   return feed.end({ pretty: true });
 }
-
 
 // OPDS route
 app.get('/opds', async (req, res) => {
@@ -427,5 +421,3 @@ app.get('/opds', async (req, res) => {
     res.status(500).send('Failed to generate OPDS feed');
   }
 });
-
-

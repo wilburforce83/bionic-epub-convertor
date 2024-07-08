@@ -8,7 +8,7 @@ Dyslibria is a simple bionic reading conversion app for epub files, with an onli
 - User authentication to secure access
 - File upload and management through a WebDAV server
 - Automatic EPUB file processing
-- OPDS server integration for eBook distribution
+- OPDS server integration for eBook distribution (for some reason that I can't work out opds doesn't work with Moon Reader, on Adroid please use FBReader)
 - Scheduled tasks for database updates
 
 ## Getting Started
