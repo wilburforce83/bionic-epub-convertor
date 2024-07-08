@@ -32,9 +32,9 @@ console.log(webdavUsername, webdavPassword);
 const { exec } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 const BASE_URL = process.env.BASE_URL || 'localhost:' + PORT;
-
-
 const result = dotenv.config();
+
+app.set('trust proxy', true);  // Trust the first proxy
 
 if (result.error) {
   console.error('Dotenv config error:', result.error);
