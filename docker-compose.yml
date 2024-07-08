@@ -1,0 +1,17 @@
+version: '3.8'
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"  # Map TCP port 3000 in the container to port 3000 on the Docker host.
+    volumes:
+      - ./uploads:/usr/src/app/uploads  # Mount host's `uploads` directory to container's `/usr/src/app/uploads`
+      - ./processed:/usr/src/app/processed  # Mount host's `processed` directory to container's `/usr/src/app/processed`
+    environment:
+      - MAIN_PORT=3000
+      - WEBDAV_PORT=1900
+      - BASE_URL=http://localhost:3000 # Must match URL and external facing port for opds server
+      - WEBDAV_USERNAME=dys
+      - WEBDAV_PASSWORD=password
+      - NODE_ENV=production
+    restart: on-failure

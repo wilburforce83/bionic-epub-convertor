@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 2,
+  "templateId": "node/16.13.0",
+  "dockerfileLines": [
+    "FROM node:16 AS builder",
+    "WORKDIR /usr/src/app",
+    "COPY package*.json ./",
+    "RUN npm install --only=production",
+    "COPY . ./",
+    "FROM node:16",
+    "WORKDIR /usr/src/app",
+    "COPY --from=builder /usr/src/app /usr/src/app",
+    "EXPOSE 3000",
+    "CMD [\"node\", \"server.js\"]"
+  ]
+}
