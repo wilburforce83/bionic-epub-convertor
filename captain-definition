@@ -1,6 +1,5 @@
 {
   "schemaVersion": 2,
-  "templateId": "node/16.13.0",
   "dockerfileLines": [
     "FROM node:16 AS builder",
     "WORKDIR /usr/src/app",
