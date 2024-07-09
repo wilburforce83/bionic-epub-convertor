@@ -10,7 +10,7 @@ services:
     environment:
       - MAIN_PORT=3000
       - WEBDAV_PORT=1900
-      - BASE_URL=http://localhost:3000 # Must match URL and external facing port for opds server
+      - BASE_URL=http://localhost:3000 # Must match URL and EXTERNAL facing port for opds server default is localhost:+MAIN_PORT
       - WEBDAV_USERNAME=dys
       - WEBDAV_PASSWORD=password
       - NODE_ENV=production
