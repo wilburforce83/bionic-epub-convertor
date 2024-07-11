@@ -169,5 +169,3 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 - EPUB.js library
 - Any other library or developer whose code was used
 ```
-
-This template should be adjusted according to the specific requirements and details of your project. It provides a strong foundation for the documentation of your application, ensuring that users and contributors have a clear understanding of how to install, use, and contribute to your project.
