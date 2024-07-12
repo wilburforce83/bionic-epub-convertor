@@ -5,15 +5,16 @@ Dyslibria is a simple bionic reading conversion app for epub files, with an onli
 
 ## Features
 
-- User authentication to secure access
-- File upload and management through a WebDAV server
-- Automatic EPUB file processing
-- OPDS server integration for eBook distribution (for some reason that I can't work out opds doesn't work with Moon Reader, on Adroid please use FBReader)
-- Scheduled tasks for database updates
+- Automatic conversion of Epub files to bionic text
+- Processed files can be directed to Calibre library automatically.
+- Full desktop and mobile device navigation and reading of processed books.
+- OPDS server integration for eBook distribution (for some reason that I can't work out opds doesn't work with Moon Reader, on Android please use FBReader)
+- Self-host on your own server (Raspberry Pi etc)
+- WebDav support if you are a Neanderthal.
 
 ## Getting Started
 
-These instructions will get you set up with your own copy of Dyslibria.
+These instructions will get you set up with your own self-hosted version of Dyslibria.
 
 ### Prerequisites
 
@@ -24,8 +25,8 @@ Before you start, ensure you have Node.js and npm installed on your system. You 
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/yourrepository/dyslibria.git
-   cd dyslibria
+   git clone https://github.com/wilburforce83/bionic-epub-convertor.git
+   cd bionic-epub-convertor
    ```
 
 2. **Install dependencies:**
@@ -35,6 +36,8 @@ Before you start, ensure you have Node.js and npm installed on your system. You 
    ```
 
 3. **Set up environment variables:**
+
+Note; if you want to access Dyslibria outside your home network you will need to add a `BASE_URL` to `.env`. As external access is through port forwarding this URL must include the port you have opened and forwarded to in your router; this might be the same, or different to your application port.
 
    Create a `.env` file in the root directory of your project and update it with your specific settings:
 
@@ -68,13 +71,11 @@ npm install pm2 -g
 
 #### Starting the Application with PM2
 
-To start your Node.js application with PM2, navigate to your project directory and use the following command:
+To start Dyslibria with PM2, navigate to the project directory and use the following command:
 
 ```bash
-pm2 start app.js --name dyslibria
+pm2 start server.js --name dyslibria
 ```
-
-Replace `app.js` with the entry file of your application if it's different. The `--name` flag is optional but helps identify the process.
 
 #### Monitoring Your Application
 
@@ -84,7 +85,7 @@ Once your application is running under PM2, you can monitor it using the followi
 pm2 list
 ```
 
-This command displays a list of all processes currently managed by PM2. To get more detailed information about a specific process, use:
+This command displays a list of all processes currently managed by PM2. To get more detailed information about the Dyslibria process, use:
 
 ```bash
 pm2 show dyslibria
@@ -138,8 +139,8 @@ This command saves the current running processes and their configurations, allow
 
 ### Directory Structure
 
-- `uploads/`: Temporary storage for uploaded EPUB files.
-- `processed/`: Where processed EPUB files are stored.
+- `uploads/`: Temporary storage for uploaded EPUB files (Default can be changed in the UI).
+- `processed/`: Where processed EPUB files are stored (Default can be changed in the UI).
 - `temp/`: Temporary files during EPUB processing.
 - `public/`: Static files accessible publicly.
 - `authenticated/`: Protected static files for authenticated users.
@@ -148,11 +149,11 @@ This command saves the current running processes and their configurations, allow
 
 ### Logging In
 
-Navigate to `http://localhost:3000/` and enter the credentials as defined in your `.env` file to access the authenticated sections of the application.
+Navigate to `http://localhost:3000/` and enter the credentials as defined in your `.env` file to access the authenticated sections of the application. If you didn't specify login details the default of `dys` and `password` will have been generated.
 
 ### Uploading EPUBs
 
-Files can be uploaded through the `/upload` route either via the provided web interface or programmatically using tools like `curl`.
+Files can be uploaded through the `/upload` route either via the provided web interface or programmatically using tools like `curl`. Or, simply drag and drop the Epub file into the uploads folder.
 
 ### Accessing EPUBs outside the web portal
 
@@ -167,5 +168,5 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 
 - Node.js community
 - EPUB.js library
-- Any other library or developer whose code was used
-```
+- Fomantic UI
+- Any other library or developer whose code was used.
