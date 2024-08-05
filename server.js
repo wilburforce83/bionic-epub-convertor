@@ -1,5 +1,5 @@
-const dotenv = require('dotenv');
-dotenv.config();
+//const dotenv = require('dotenv');
+//dotenv.config();
 
 const express = require('express');
 const fileUpload = require('express-fileupload');
@@ -32,15 +32,16 @@ console.log(webdavUsername, webdavPassword);
 const { exec } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 const BASE_URL = process.env.BASE_URL || 'localhost:' + PORT;
-const result = dotenv.config();
+//const result = dotenv.config();
 
 app.set('trust proxy', true);  // Trust the first proxy
-
+/*
 if (result.error) {
   console.error('Dotenv config error:', result.error);
 } else {
   console.log('Dotenv config success:', result.parsed);
 }
+  */
 
 // Initialize SimpleJsonDB for settings
 const db = new SimpleJsonDB(path.join('./db/db.json'));
