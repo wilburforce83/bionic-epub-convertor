@@ -50,13 +50,16 @@ $(document).ready(function () {
   const $heroToggleIcon = $('#heroToggleIcon');
   const $heroToggleLabel = $('#heroToggleLabel');
   const $searchBar = $('#searchBar');
-  const $installButton = $('#installButton');
   const $dropZone = $('#dropZone');
   const $fileInput = $('#epubFiles');
   const $themeToggle = $('#themeToggle');
   const $themeToggleIcon = $('#themeToggleIcon');
   const $themeToggleText = $('#themeToggleText');
   const $themeColorSelect = $('#themeColorSelect');
+  const $openInstallHelpButton = $('#openInstallHelpButton');
+  const $closeInstallHelpButton = $('#closeInstallHelpButton');
+  const $installPopover = $('#installPopover');
+  const $settingsInstallButton = $('#settingsInstallButton');
   const $conversionStatus = $('#conversionStatus');
   const $conversionStatusText = $('#conversionStatusText');
   const $heroStatusText = $('#heroStatusText');
@@ -79,7 +82,7 @@ $(document).ready(function () {
   const $toolbarActions = $('#toolbarActions');
 
   if (window.DyslibriaPwa) {
-    window.DyslibriaPwa.bindInstallButton($installButton.get(0));
+    window.DyslibriaPwa.bindInstallButton($settingsInstallButton.get(0));
   }
 
   function randomTipDelay() {
@@ -186,11 +189,7 @@ $(document).ready(function () {
       : `${visibleCount}`;
 
     $count.text(`${prefix} ${suffix}`);
-    $libraryMeta.text(
-      state.query
-        ? 'Search stays pinned so you can narrow the wall without losing your place.'
-        : 'Search stays visible so you can jump straight to a title.'
-    );
+    $libraryMeta.text('');
   }
 
   function getFilteredBooks() {
@@ -442,6 +441,7 @@ $(document).ready(function () {
     $('#settingsButton').on('click', function () {
       closeMobileMenu();
       $.get('/settings', function (data) {
+        $installPopover.prop('hidden', true);
         if (Array.isArray(data.themeColors) && data.themeColors.length) {
           state.themeColorOptions = data.themeColors;
         }
@@ -461,6 +461,7 @@ $(document).ready(function () {
     });
 
     $('#cancelSettingsButton').on('click', function () {
+      $installPopover.prop('hidden', true);
       $('#settingsModal').modal('hide');
     });
 
@@ -470,6 +471,7 @@ $(document).ready(function () {
       $.post('/settings', settingsData, function (response) {
         state.themeColorKey = $themeColorSelect.val() || state.themeColorKey;
         applyTheme();
+        $installPopover.prop('hidden', true);
         $('#settingsModal').modal('hide');
         alert(
           response && response.requiresRestart
@@ -609,6 +611,18 @@ $(document).ready(function () {
       state.mobileMenuOpen = !state.mobileMenuOpen;
       $toolbarActions.toggleClass('is-open', state.mobileMenuOpen);
       $(this).attr('aria-expanded', String(state.mobileMenuOpen));
+    });
+
+    $openInstallHelpButton.on('click', function () {
+      $installPopover.prop('hidden', false);
+
+      if (window.DyslibriaPwa && typeof window.DyslibriaPwa.refreshButtons === 'function') {
+        window.DyslibriaPwa.refreshButtons();
+      }
+    });
+
+    $closeInstallHelpButton.on('click', function () {
+      $installPopover.prop('hidden', true);
     });
 
     $(window).on('resize', function () {

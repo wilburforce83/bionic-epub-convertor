@@ -57,10 +57,6 @@
             <i class="moon icon" id="themeToggleIcon" aria-hidden="true"></i>
             <span id="themeToggleText">Dark theme</span>
           </button>
-          <button class="ui button app-button ghost hidden" id="installButton" type="button" hidden>
-            <i class="download icon" aria-hidden="true"></i>
-            <span>Install</span>
-          </button>
           <button class="ui button app-button ghost" id="viewLogsButton" type="button">
             <i class="file alternate outline icon" aria-hidden="true"></i>
             <span id="viewLogsLabel">Logs</span>
@@ -123,7 +119,7 @@
             <article class="stat-chip">
               <span class="stat-label">Library size</span>
               <strong id="libraryCount">0 books</strong>
-              <p id="libraryMeta">Search stays visible so you can jump straight to a title.</p>
+              <p id="libraryMeta"></p>
             </article>
 
             <article class="stat-chip">
@@ -198,6 +194,20 @@
           <select name="themeColor" id="themeColorSelect"></select>
         </div>
       </form>
+      <div class="settings-install-link-row">
+        <button class="modal-text-link" id="openInstallHelpButton" type="button">Install Dyslibria on this device</button>
+      </div>
+      <section class="install-popover" id="installPopover" hidden>
+        <p class="eyebrow">Install</p>
+        <h3>Install Dyslibria</h3>
+        <p>Use this on phones, tablets, or desktops when you want Dyslibria to launch more like a dedicated app.</p>
+        <div class="install-popover-actions">
+          <button class="ui button app-button accent hidden" id="settingsInstallButton" type="button" hidden>
+            Install app
+          </button>
+          <button class="ui button" id="closeInstallHelpButton" type="button">Close</button>
+        </div>
+      </section>
     </div>
     <div class="actions">
       <button class="ui button" id="cancelSettingsButton" type="button">Cancel</button>

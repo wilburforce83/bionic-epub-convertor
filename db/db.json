@@ -4,5 +4,5 @@
     "uploadPath": "/Users/wilbur/Projects/bionic-epub-convertor/uploads",
     "libraryPath": "/Users/wilbur/Projects/bionic-epub-convertor/processed",
     "baseUrl": "http://localhost:3100",
-    "themeColor": "ember"
+    "themeColor": "gold"
 }
