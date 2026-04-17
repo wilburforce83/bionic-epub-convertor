@@ -1,186 +1,65 @@
+# Dyslibria
 
-# Dyslibria Epub Library Management System
+Dyslibria is a self-hosted EPUB conversion, library, and browser reading app built around a bionic-style reading transform. Upload EPUB files, convert them into Dyslibria format, read them in the web UI, or access the processed library over OPDS and WebDAV.
 
-Dyslibria is a simple bionic reading conversion app for epub files, with an online library and reader. This is an open-source alogrythm designed by me, it is not the same as the official bionic font, and no copyright infringment is intended, this is for free-use and open-sourced for self hosting designed to handle and process your own EPUB files. It includes features such as file uploads, EPUB processing, desktop and mobile support for library management and a WebDAV and opds server for easy file access for mobile app like Moonreader etc
+## What It Does
 
-## Features
+- Converts uploaded EPUB files into Dyslibria's bionic-style reading format
+- Stores a processed library for browser reading, OPDS clients, and WebDAV access
+- Includes a responsive reader for desktop, tablet, mobile, and installed PWA use
+- Saves reading progress on the server so books reopen at the last location
+- Quarantines failed conversions instead of silently publishing broken books
 
-- Automatic conversion of Epub files to bionic text
-- Processed files can be directed to Calibre library automatically.
-- Full desktop and mobile device navigation and reading of processed books.
-- OPDS server integration for eBook distribution (for some reason that I can't work out opds doesn't work with Moon Reader, on Android please use FBReader)
-- Self-host on your own server (Raspberry Pi etc)
-- WebDav support if you are a Neanderthal.
+## Quick Start
 
-## Getting Started
-
-These instructions will get you set up with your own self-hosted version of Dyslibria.
-
-### Prerequisites
-
-Before you start, ensure you have Node.js 20 or newer and npm installed on your system. The repository includes an `.nvmrc` file for a known-good local version.
-
-### Installation
-
-1. **Clone the repository:**
-
-   ```bash
-   git clone https://github.com/wilburforce83/bionic-epub-convertor.git
-   cd bionic-epub-convertor
-   ```
-
-2. **Install dependencies:**
-
-   ```bash
-   npm install
-   ```
-
-3. **Set up environment variables:**
-
-Note; if you want to access Dyslibria outside your home network you will need to add a `BASE_URL` to `.env`. As external access is through port forwarding this URL must include the port you have opened and forwarded to in your router; this might be the same, or different to your application port.
-
-   Create a `.env` file in the root directory of your project and update it with your specific settings:
-
-   ```plaintext
-   MAIN_PORT=3000
-   WEBDAV_PORT=1900
-   WEBDAV_USERNAME=your-username
-   WEBDAV_PASSWORD=your-strong-password
-   SESSION_SECRET=your-long-random-session-secret
-   BASE_URL=https://your-domain.example // include the external scheme and port if needed
-   ```
-
-4. **Start the application:**
-
-   ```bash
-   npm start
-   ```
-
-   This command will start both the main server on `http://localhost:3000` and the WebDAV server on `http://localhost:1900`.
-
-5. **Run the EPUB pipeline tests:**
-
-   ```bash
-   npm test
-   ```
-
-   The test suite covers archive path validation, XHTML conversion, EPUB repackaging, and metadata handling for broken books.
-
-### Using PM2 with the Dyslibria Library Management System
-
-PM2 is a process manager for Node.js applications that provides an easy way to manage and daemonize applications. It allows you to keep applications alive forever, reload them without downtime, and facilitate common DevOps tasks.
-
-#### Installing PM2
-
-To install PM2, run the following command:
+The recommended path is Docker.
 
 ```bash
-npm install pm2 -g
+git clone https://github.com/wilburforce83/bionic-epub-convertor.git
+cd bionic-epub-convertor
+cp .env.example .env
+mkdir -p uploads processed db failed
+docker compose up -d
 ```
 
-#### Starting the Application with PM2
+The included Compose file pulls the published image:
 
-To start Dyslibria with PM2, navigate to the project directory and use the following command:
+- `wilburforce83/dyslibria:latest`
 
-```bash
-pm2 start server.js --name dyslibria
-```
+If you want to pin a specific release instead of tracking `latest`, set `IMAGE_TAG` in `.env`.
 
-#### Monitoring Your Application
+Then open:
 
-Once your application is running under PM2, you can monitor it using the following command:
+- Web app: `http://localhost:3000`
+- WebDAV: `http://localhost:1900`
+- OPDS: `http://localhost:3000/opds`
 
-```bash
-pm2 list
-```
+## Documentation
 
-This command displays a list of all processes currently managed by PM2. To get more detailed information about the Dyslibria process, use:
+- [Installation Guide](docs/INSTALL.md)
+- [Usage Guide](docs/USAGE.md)
+- [Maintainer Release Guide](docs/RELEASE.md)
 
-```bash
-pm2 show dyslibria
-```
+## Main Data Folders
 
-#### Managing Application Logs
+- `uploads/`: staged incoming EPUB files
+- `processed/`: the live processed library
+- `db/`: settings, metadata cache, and reading-progress data
+- `failed/`: quarantined files that failed validation or conversion
+- `temp/`: temporary processing files only, not intended for persistence
 
-PM2 automatically handles the logs. You can view the logs by using:
+## Health Check
 
-```bash
-pm2 logs dyslibria
-```
+The app exposes:
 
-To view logs in real-time, just run the above command without any additional parameters.
+- `GET /healthz`
 
-#### Stopping and Restarting the Application
+This returns basic service state including queue length, processing state, and metadata readiness.
 
-To stop the application managed by PM2, use:
+## Local Development
 
-```bash
-pm2 stop dyslibria
-```
-
-To restart the application, use:
-
-```bash
-pm2 restart dyslibria
-```
-
-These commands are particularly useful for applying updates or configuration changes.
-
-#### Enabling Startup Scripts
-
-To ensure your application starts on boot, you can use PM2’s startup script generator:
-
-```bash
-pm2 startup
-```
-
-After running this command, PM2 will provide you with a command that you need to execute with superuser privileges. This command registers a PM2 process to revive on startup.
-
-#### Saving Your Configuration
-
-After configuring your processes, you can save the list with:
-
-```bash
-pm2 save
-```
-
-This command saves the current running processes and their configurations, allowing PM2 to restore them on restart or after a crash.
-
-### Directory Structure
-
-- `uploads/`: Temporary storage for uploaded EPUB files (Default can be changed in the UI).
-- `processed/`: Where processed EPUB files are stored (Default can be changed in the UI).
-- `temp/`: Temporary files during EPUB processing.
-- `failed/`: Quarantined uploads that failed conversion and were not published to the library.
-- `public/`: Static files accessible publicly.
-- `authenticated/`: Protected static files for authenticated users.
-
-## Usage
-
-### Logging In
-
-Navigate to `http://localhost:3000/` and enter the credentials as defined in your `.env` file to access the authenticated sections of the application.
-
-### Uploading EPUBs
-
-Files can be uploaded through the `/upload` route either via the provided web interface or programmatically using tools like `curl`. Or, simply drag and drop the Epub file into the uploads folder.
-
-### Accessing EPUBs outside the web portal
-
-Processed EPUBs can be accessed through the WebDAV server or directly via the OPDS feed at `http://localhost:3000/opds`.
-
-### Health Checks
-
-The application exposes `GET /healthz` for container health checks and basic monitoring. The response includes the current queue length, whether EPUB processing is active, and whether the metadata cache has been created.
-
+If you want to run it directly with Node instead of Docker, see the source install section in [docs/INSTALL.md](docs/INSTALL.md).
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
-
-## Acknowledgments
-
-- Node.js community
-- EPUB.js library
-- Fomantic UI
-- Any other library or developer whose code was used.
+This project is licensed under the MIT License. See [LICENSE.md](LICENSE.md).

@@ -1,9 +1,14 @@
 .git
+.github
 .gitignore
+.env
+.env.*
 node_modules
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+docs
+test
 uploads
 processed
 temp

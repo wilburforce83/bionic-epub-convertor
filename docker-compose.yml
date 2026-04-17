@@ -1,23 +1,20 @@
 version: '3.8'
+
 services:
   app:
-    build: .
+    image: wilburforce83/dyslibria:${IMAGE_TAG:-latest}
+    container_name: dyslibria
+    pull_policy: always
+    env_file:
+      - .env
     ports:
-      - "3000:3000"
-      - "1900:1900"
+      - "${MAIN_PORT:-3000}:${MAIN_PORT:-3000}"
+      - "${WEBDAV_PORT:-1900}:${WEBDAV_PORT:-1900}"
     volumes:
       - ./uploads:/usr/src/app/uploads
       - ./processed:/usr/src/app/processed
       - ./db:/usr/src/app/db
       - ./failed:/usr/src/app/failed
-    environment:
-      MAIN_PORT: 3000
-      WEBDAV_PORT: 1900
-      BASE_URL: ${BASE_URL:-http://localhost:3000}
-      WEBDAV_USERNAME: ${WEBDAV_USERNAME}
-      WEBDAV_PASSWORD: ${WEBDAV_PASSWORD}
-      SESSION_SECRET: ${SESSION_SECRET}
-      NODE_ENV: production
     healthcheck:
       test:
         - CMD
