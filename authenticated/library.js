@@ -174,7 +174,7 @@ $(document).ready(function () {
   function applyBannerState() {
     $heroShell.toggleClass('is-collapsed', state.bannerCollapsed);
     $heroToggle.attr('aria-expanded', String(!state.bannerCollapsed));
-    $heroToggleLabel.text(state.bannerCollapsed ? 'Expand banner' : 'Collapse banner');
+    $heroToggleLabel.text(state.bannerCollapsed ? 'Expand Dashboard' : 'Collapse Dashboard');
     $heroToggleIcon.attr('class', state.bannerCollapsed ? 'angle down icon' : 'angle up icon');
     localStorage.setItem(BANNER_STORAGE_KEY, String(state.bannerCollapsed));
   }

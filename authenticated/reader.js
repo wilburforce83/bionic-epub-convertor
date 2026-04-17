@@ -642,6 +642,14 @@
     elements.tocList.appendChild(buildTocList(items, true));
   }
 
+  function formatPageLabel(pageNumber, totalPages) {
+    if (!Number.isFinite(pageNumber) || !Number.isFinite(totalPages) || pageNumber <= 0 || totalPages <= 0) {
+      return '';
+    }
+
+    return `Page ${pageNumber} of ${totalPages}`;
+  }
+
   function setActiveTocEntry(currentHref) {
     const normalizedCurrentHref = normalizeHref(currentHref);
     const tocButtons = elements.tocList.querySelectorAll('.toc-link');
@@ -670,6 +678,14 @@
     });
 
     let percent = latestProgress.progressPercent || 0;
+    let pageNumber = Number.isFinite(location.start.location) ? location.start.location + 1 : null;
+    let totalPages = book && book.locations && Number.isFinite(book.locations.total)
+      ? book.locations.total + 1
+      : null;
+
+    if (Number.isFinite(location.start.percentage)) {
+      percent = Math.round(location.start.percentage * 100);
+    }
 
     if (book && book.locations && location.start.cfi) {
       try {
@@ -679,9 +695,15 @@
       }
     }
 
-    const pageLabel = displayed.page && displayed.total
-      ? `Page ${displayed.page} of ${displayed.total}`
-      : '';
+    if (!Number.isFinite(pageNumber) && displayed.page) {
+      pageNumber = displayed.page;
+    }
+
+    if (!Number.isFinite(totalPages) && displayed.total) {
+      totalPages = displayed.total;
+    }
+
+    const pageLabel = formatPageLabel(pageNumber, totalPages);
     const chapterParts = [];
 
     if (activeEntry && activeEntry.label) {
@@ -700,8 +722,8 @@
       progressPercent: percent,
       chapterLabel,
       pageLabel,
-      pageNumber: displayed.page || null,
-      totalPages: displayed.total || null,
+      pageNumber: Number.isFinite(pageNumber) ? pageNumber : null,
+      totalPages: Number.isFinite(totalPages) ? totalPages : null,
       href: activeHref
     };
 
@@ -744,6 +766,11 @@
 
     if (snapshot.pageLabel) {
       elements.progressDetail.textContent = `${snapshot.pageLabel}. Reading progress saves on the server automatically.`;
+    } else {
+      const fallbackPageLabel = formatPageLabel(snapshot.pageNumber, snapshot.totalPages);
+      if (fallbackPageLabel) {
+        elements.progressDetail.textContent = `${fallbackPageLabel}. Reading progress saves on the server automatically.`;
+      }
     }
   }
 
@@ -875,6 +902,12 @@
       flattenTocEntries(tocEntries, flatTocEntries);
       renderTocList(tocEntries);
 
+      try {
+        await book.locations.generate(1600);
+      } catch (error) {
+        console.warn('Unable to generate reading locations before first render:', error);
+      }
+
       const savedProgress = await savedProgressPromise;
       applySavedProgress(savedProgress);
 
@@ -883,13 +916,7 @@
       applyReaderSettings();
       resizeRendition();
       markLoaded();
-
-      try {
-        await book.locations.generate(1600);
-        updateProgress(rendition.currentLocation());
-      } catch (error) {
-        console.warn('Unable to generate reading locations:', error);
-      }
+      updateProgress(rendition.currentLocation());
     } catch (error) {
       console.error('Reader failed to load:', error);
       updateMetadata('Unable to open book', error.message);
