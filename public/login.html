@@ -8,8 +8,11 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#93381f">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Dyslibria">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
   <script defer src="/app-theme.js"></script>
 
   <style>
@@ -126,7 +129,7 @@
   <main class="login-shell">
     <section class="login-card">
       <p class="eyebrow">Accessible self-hosted library</p>
-      <h1 class="brand"><span class="brand-kicker">Dysli</span>bria</h1>
+      <h1 class="brand"><span class="brand-kicker">Dys</span>libria</h1>
       <p class="login-copy">Sign in to manage your library, resume your place, and keep EPUB conversion running in one place.</p>
 
       <form class="ui form" method="post" action="/login">
@@ -187,7 +190,7 @@
             .filter(function(registration) {
               try {
                 const scriptPath = new URL(getRegistrationScriptUrl(registration)).pathname;
-                return scriptPath === '/sw.js' || scriptPath === '/app-sw.js';
+                return scriptPath === '/sw.js';
               } catch (error) {
                 return false;
               }
@@ -201,8 +204,7 @@
             return caches.keys().then(function(cacheNames) {
               return Promise.all(cacheNames
                 .filter(function(cacheName) {
-                  return cacheName.indexOf('dyslibria-cache') === 0 ||
-                    cacheName.indexOf('dyslibria-assets-') === 0;
+                  return cacheName.indexOf('dyslibria-cache') === 0;
                 })
                 .map(function(cacheName) { return caches.delete(cacheName); }));
             });

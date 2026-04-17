@@ -1,25 +1,51 @@
 {
-  "id": "/authenticated/index.html",
+  "id": "/authenticated/index.html?source=pwa",
   "short_name": "Dyslibria",
-  "name": "Dyslibria Reader",
+  "name": "Dyslibria",
   "description": "A self-hosted EPUB conversion and reading app with browser, OPDS, and WebDAV access.",
+  "lang": "en-GB",
   "icons": [
     {
-      "src": "icons/icon-192x192.png",
+      "src": "/icons/icon-192x192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any"
     },
     {
-      "src": "icons/icon-512x512.png",
+      "src": "/icons/icon-512x512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-192x192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-maskable-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
     }
   ],
-  "start_url": "/authenticated/index.html",
+  "start_url": "/authenticated/index.html?source=pwa",
   "scope": "/",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui"
+  ],
   "display": "standalone",
-  "background_color": "#f5efd8",
-  "theme_color": "#18281f",
-  "orientation": "any"
+  "background_color": "#171312",
+  "theme_color": "#93381f",
+  "orientation": "any",
+  "categories": [
+    "books",
+    "productivity",
+    "utilities"
+  ],
+  "prefer_related_applications": false
 }
   

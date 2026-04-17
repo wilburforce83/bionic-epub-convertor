@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Dyslibria Offline</title>
+  <meta name="theme-color" content="#93381f">
+  <script defer src="/app-theme.js"></script>
+  <style>
+    :root {
+      --offline-bg:
+        radial-gradient(circle at top left, rgba(var(--app-accent-rgb, 208, 88, 52), 0.2), transparent 34%),
+        linear-gradient(180deg, #171312 0%, #221c1a 100%);
+      --offline-surface: rgba(30, 24, 22, 0.94);
+      --offline-border: rgba(255, 220, 206, 0.08);
+      --offline-text: #f7eee8;
+      --offline-muted: #c8b5ac;
+      --ui-radius: 0.5rem;
+      --heading-font: "Lato", "Helvetica Neue", Arial, Helvetica, sans-serif;
+      --body-font: "Avenir Next", "Segoe UI", "Trebuchet MS", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+      margin: 0;
+      background: var(--offline-bg);
+      color: var(--offline-text);
+      font-family: var(--body-font);
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+      padding: 1rem;
+    }
+
+    .offline-card {
+      width: min(100%, 32rem);
+      padding: 1.5rem;
+      border: 1px solid var(--offline-border);
+      border-radius: var(--ui-radius);
+      background: var(--offline-surface);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
+    }
+
+    .eyebrow {
+      margin: 0 0 0.55rem;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      font-size: 0.72rem;
+      color: var(--offline-muted);
+    }
+
+    .brand {
+      margin: 0 0 1rem;
+      font-family: var(--heading-font);
+      font-size: clamp(2.2rem, 6vw, 3.3rem);
+      line-height: 0.95;
+      font-weight: 300;
+      letter-spacing: -0.04em;
+    }
+
+    .brand-kicker {
+      color: var(--app-accent, #d05834);
+      font-weight: 600;
+    }
+
+    h1 {
+      margin: 0 0 0.8rem;
+      font-family: var(--heading-font);
+      font-size: clamp(1.5rem, 4vw, 2rem);
+      font-weight: 400;
+    }
+
+    p {
+      margin: 0 0 0.85rem;
+      line-height: 1.65;
+      color: var(--offline-muted);
+    }
+
+    .retry-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 2.9rem;
+      padding: 0 1rem;
+      border-radius: 0.28571429rem;
+      background: var(--app-accent, #d05834);
+      color: var(--app-accent-contrast, #fff8f4);
+      text-decoration: none;
+      font-weight: 600;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="offline-card">
+    <p class="eyebrow">Offline</p>
+    <div class="brand"><span class="brand-kicker">Dys</span>libria</div>
+    <h1>Your library needs a connection.</h1>
+    <p>Dyslibria can keep its shell and install assets ready offline, but your library and reading data still need your server to be reachable.</p>
+    <p>Reconnect to your server, then reopen the app or refresh this screen.</p>
+    <a class="retry-link" href="/authenticated/index.html">Try again</a>
+  </main>
+
+  <script>
+    if (window.DyslibriaTheme) {
+      window.DyslibriaTheme.applyPalette(window.DyslibriaTheme.DEFAULT_COLOR_KEY, document.documentElement);
+    }
+  </script>
+</body>
+
+</html>

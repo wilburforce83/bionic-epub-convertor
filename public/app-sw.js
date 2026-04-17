@@ -1,20 +1,17 @@
-const STATIC_CACHE = 'dyslibria-assets-v12';
+const STATIC_CACHE = 'dyslibria-assets-v13';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/app-theme.js',
+  '/offline.html',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
-  '/authenticated/library.css',
-  '/authenticated/library.js',
-  '/authenticated/reader.css',
-  '/authenticated/reader.js',
-  '/authenticated/pwa.js',
-  '/authenticated/jquery.js',
-  '/authenticated/semantic.min.css',
-  '/authenticated/semantic.min.js',
-  '/authenticated/jszip.min.js',
-  '/authenticated/epub.js',
-  '/authenticated/ajax-loader.gif'
+  '/icons/icon-maskable-192x192.png',
+  '/icons/icon-maskable-512x512.png',
+  '/icons/apple-touch-icon.png'
+];
+const APP_SHELL_DOCUMENTS = [
+  '/authenticated/index.html',
+  '/authenticated/reader.html'
 ];
 
 function isCacheableRequest(request, url) {
@@ -31,6 +28,15 @@ function isCacheableRequest(request, url) {
   }
 
   return ['style', 'script', 'image', 'font'].includes(request.destination);
+}
+
+function isValidNavigationResponse(response) {
+  if (!response || !response.ok) {
+    return false;
+  }
+
+  const contentType = (response.headers.get('content-type') || '').toLowerCase();
+  return contentType.includes('text/html');
 }
 
 function isValidCachedResponse(request, response) {
@@ -77,15 +83,28 @@ function shouldCacheNetworkResponse(request, response) {
 }
 
 self.addEventListener('install', function (event) {
-  event.waitUntil(
-    caches.open(STATIC_CACHE)
-      .then(function (cache) {
-        return cache.addAll(STATIC_ASSETS);
-      })
-      .then(function () {
-        return self.skipWaiting();
-      })
-  );
+  event.waitUntil((async function () {
+    const cache = await caches.open(STATIC_CACHE);
+    await cache.addAll(STATIC_ASSETS);
+
+    await Promise.all(APP_SHELL_DOCUMENTS.map(async function (documentPath) {
+      try {
+        const response = await fetch(documentPath, {
+          credentials: 'same-origin'
+        });
+
+        if (isValidNavigationResponse(response) && !response.redirected) {
+          await cache.put(documentPath, response.clone());
+        }
+      } catch (error) {
+        return null;
+      }
+
+      return null;
+    }));
+
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', function (event) {
@@ -108,6 +127,43 @@ self.addEventListener('activate', function (event) {
 
 self.addEventListener('fetch', function (event) {
   const url = new URL(event.request.url);
+
+  if (event.request.mode === 'navigate' && url.origin === self.location.origin) {
+    event.respondWith((async function () {
+      const cache = await caches.open(STATIC_CACHE);
+
+      try {
+        const response = await fetch(event.request);
+
+        if (isValidNavigationResponse(response) && !response.redirected) {
+          await cache.put(event.request, response.clone());
+        }
+
+        return response;
+      } catch (error) {
+        const cachedResponse = await cache.match(event.request, { ignoreSearch: true });
+        if (cachedResponse && isValidNavigationResponse(cachedResponse)) {
+          return cachedResponse;
+        }
+
+        const shellPath = url.pathname.startsWith('/authenticated/reader')
+          ? '/authenticated/reader.html'
+          : '/authenticated/index.html';
+        const cachedShell = await cache.match(shellPath, { ignoreSearch: true });
+        if (cachedShell && isValidNavigationResponse(cachedShell)) {
+          return cachedShell;
+        }
+
+        const offlineResponse = await cache.match('/offline.html');
+        if (offlineResponse) {
+          return offlineResponse;
+        }
+
+        throw error;
+      }
+    })());
+    return;
+  }
 
   if (!isCacheableRequest(event.request, url)) {
     return;
