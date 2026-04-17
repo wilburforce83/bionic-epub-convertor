@@ -1,32 +1,31 @@
 {
     "name": "epub-processor",
     "version": "1.0.0",
-    "description": "A simple EPUB processor that allows file upload and processing via a static webpage.",
+    "description": "Self-hosted EPUB processing and library management with bionic text conversion.",
     "main": "server.js",
     "scripts": {
-        "start": "node server.js"
+        "start": "node server.js",
+        "test": "node --test test/*.test.js"
     },
     "dependencies": {
         "adm-zip": "^0.5.14",
-        "body-parser": "^1.20.2",
-        "cheerio": "^1.0.0-rc.12",
-        "chokidar": "^3.6.0",
+        "cheerio": "^1.1.2",
+        "chokidar": "^4.0.3",
         "dotenv": "^16.4.5",
-        "epub": "^0.1.0",
-        "epub-gen": "^0.1.0",
-        "express": "^4.18.2",
-        "express-fileupload": "^1.4.0",
-        "express-session": "^1.18.0",
+        "express": "^5.1.0",
+        "express-fileupload": "^1.5.2",
+        "express-session": "^1.19.0",
         "fs-extra": "^11.2.0",
-        "image-size": "^1.1.1",
+        "image-size": "^2.0.2",
         "jszip": "^3.10.1",
         "node-cron": "^3.0.3",
-        "sanitize-html": "^2.13.0",
         "simple-json-db": "^2.0.0",
         "uuid": "^10.0.0",
-        "webdav": "^5.6.0",
         "webdav-server": "^2.6.2",
         "xmlbuilder": "^15.1.1"
+    },
+    "engines": {
+        "node": ">=20"
     },
     "author": "",
     "license": "ISC"

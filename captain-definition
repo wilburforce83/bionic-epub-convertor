@@ -1,15 +1,17 @@
 {
   "schemaVersion": 2,
   "dockerfileLines": [
-    "FROM node:18 AS builder",
+    "FROM node:20-bookworm-slim AS builder",
     "WORKDIR /usr/src/app",
     "COPY package*.json ./",
-    "RUN npm install --only=production",
+    "RUN npm ci --omit=dev",
     "COPY . .",
-    "FROM node:18",
+    "FROM node:20-bookworm-slim",
     "WORKDIR /usr/src/app",
     "COPY --from=builder /usr/src/app /usr/src/app",
     "EXPOSE 3000",
-    "CMD [\"node\", \"start\"]"
+    "EXPOSE 1900",
+    "HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD node -e \"fetch('http://127.0.0.1:' + (process.env.MAIN_PORT || 3000) + '/healthz').then((res) => { process.exit(res.ok ? 0 : 1); }).catch(() => process.exit(1))\"",
+    "CMD [\"npm\", \"start\"]"
   ]
 }

@@ -8,6 +8,8 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#202021">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <style>
     body,
@@ -58,13 +60,45 @@
   </div>
 
   <script>
+    function getRegistrationScriptUrl(registration) {
+      return (
+        (registration.active && registration.active.scriptURL) ||
+        (registration.waiting && registration.waiting.scriptURL) ||
+        (registration.installing && registration.installing.scriptURL) ||
+        ''
+      );
+    }
+
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js')
-        .then(function(registration) {
-          console.log('Service Worker registered with scope:', registration.scope);
+      navigator.serviceWorker.getRegistrations()
+        .then(function(registrations) {
+          return Promise.all(registrations
+            .filter(function(registration) {
+              try {
+                const scriptPath = new URL(getRegistrationScriptUrl(registration)).pathname;
+                return scriptPath === '/sw.js' || scriptPath === '/app-sw.js';
+              } catch (error) {
+                return false;
+              }
+            })
+            .map(function(registration) {
+              return registration.unregister();
+          }));
+        })
+        .then(function() {
+          if ('caches' in window) {
+            return caches.keys().then(function(cacheNames) {
+              return Promise.all(cacheNames
+                .filter(function(cacheName) {
+                  return cacheName.indexOf('dyslibria-cache') === 0 ||
+                    cacheName.indexOf('dyslibria-assets-') === 0;
+                })
+                .map(function(cacheName) { return caches.delete(cacheName); }));
+            });
+          }
         })
         .catch(function(error) {
-          console.log('Service Worker registration failed:', error);
+          console.log('Service worker cleanup failed:', error);
         });
     }
   </script>

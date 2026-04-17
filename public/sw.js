@@ -1,21 +1,22 @@
-self.addEventListener('install', function(event) {
-    event.waitUntil(
-      caches.open('dyslibria-cache-v1').then(function(cache) {
-        return cache.addAll([
-          '/',
-          'login.html',
-          'icons/icon-192x192.png',
-          'icons/icon-512x512.png'
-        ]);
-      })
+self.addEventListener('install', function() {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', function(event) {
+  event.waitUntil((async function() {
+    const cacheNames = await caches.keys();
+    await Promise.all(
+      cacheNames
+        .filter(function(cacheName) { return cacheName.indexOf('dyslibria-cache') === 0; })
+        .map(function(cacheName) { return caches.delete(cacheName); })
     );
-  });
-  
-  self.addEventListener('fetch', function(event) {
-    event.respondWith(
-      caches.match(event.request).then(function(response) {
-        return response || fetch(event.request);
-      })
-    );
-  });
+
+    await self.registration.unregister();
+
+    const clients = await self.clients.matchAll({ type: 'window' });
+    await Promise.all(clients.map(function(client) {
+      return client.navigate(client.url);
+    }));
+  })());
+});
   

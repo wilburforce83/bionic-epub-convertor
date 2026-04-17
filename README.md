@@ -18,7 +18,7 @@ These instructions will get you set up with your own self-hosted version of Dysl
 
 ### Prerequisites
 
-Before you start, ensure you have Node.js and npm installed on your system. You can download them from [Node.js official website](https://nodejs.org/).
+Before you start, ensure you have Node.js 20 or newer and npm installed on your system. The repository includes an `.nvmrc` file for a known-good local version.
 
 ### Installation
 
@@ -44,9 +44,10 @@ Note; if you want to access Dyslibria outside your home network you will need to
    ```plaintext
    MAIN_PORT=3000
    WEBDAV_PORT=1900
-   WEBDAV_USERNAME=dys
-   WEBDAV_PASSWORD=password
-   BASE_URL=yoururlandport // use this for external access to opds if you are port forwarding 
+   WEBDAV_USERNAME=your-username
+   WEBDAV_PASSWORD=your-strong-password
+   SESSION_SECRET=your-long-random-session-secret
+   BASE_URL=https://your-domain.example // include the external scheme and port if needed
    ```
 
 4. **Start the application:**
@@ -56,6 +57,14 @@ Note; if you want to access Dyslibria outside your home network you will need to
    ```
 
    This command will start both the main server on `http://localhost:3000` and the WebDAV server on `http://localhost:1900`.
+
+5. **Run the EPUB pipeline tests:**
+
+   ```bash
+   npm test
+   ```
+
+   The test suite covers archive path validation, XHTML conversion, EPUB repackaging, and metadata handling for broken books.
 
 ### Using PM2 with the Dyslibria Library Management System
 
@@ -142,6 +151,7 @@ This command saves the current running processes and their configurations, allow
 - `uploads/`: Temporary storage for uploaded EPUB files (Default can be changed in the UI).
 - `processed/`: Where processed EPUB files are stored (Default can be changed in the UI).
 - `temp/`: Temporary files during EPUB processing.
+- `failed/`: Quarantined uploads that failed conversion and were not published to the library.
 - `public/`: Static files accessible publicly.
 - `authenticated/`: Protected static files for authenticated users.
 
@@ -149,7 +159,7 @@ This command saves the current running processes and their configurations, allow
 
 ### Logging In
 
-Navigate to `http://localhost:3000/` and enter the credentials as defined in your `.env` file to access the authenticated sections of the application. If you didn't specify login details the default of `dys` and `password` will have been generated.
+Navigate to `http://localhost:3000/` and enter the credentials as defined in your `.env` file to access the authenticated sections of the application.
 
 ### Uploading EPUBs
 
@@ -158,6 +168,10 @@ Files can be uploaded through the `/upload` route either via the provided web in
 ### Accessing EPUBs outside the web portal
 
 Processed EPUBs can be accessed through the WebDAV server or directly via the OPDS feed at `http://localhost:3000/opds`.
+
+### Health Checks
+
+The application exposes `GET /healthz` for container health checks and basic monitoring. The response includes the current queue length, whether EPUB processing is active, and whether the metadata cache has been created.
 
 
 ## License

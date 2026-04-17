@@ -1,248 +1,136 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Dyslibria Reader</title>
-  <link rel="stylesheet" type="text/css" href="examples.css">
-  <script src="jszip.min.js"></script>
-  <script src="epub.js"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap"
-    rel="stylesheet">
-  <style>
-    body,
-    html {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      font-family: 'Roboto', sans-serif !important;
-      font-weight: 400;
-      overflow: hidden;
-    }
-
-
-    strong,
-    b {
-      font-weight: bold !important;
-    }
-
-    #toc {
-      height: 0vh;
-      display: none !important;
-    }
-
-    #viewer {
-      width: 100%;
-      height: 100%;
-      position: fixed;
-      top: 0;
-      left: 0;
-    }
-
-    .back-button {
-      position: fixed;
-      top: 20px;
-      left: 20px;
-      z-index: 1000;
-      background-color: black;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      padding: 10px 20px;
-      cursor: pointer;
-      font-size: 16px;
-    }
-
-    .back-button:hover {
-      background-color: #333;
-      /* Darker shade for hover effect */
-    }
-
-
-    @media (max-width: 760px) {
-      #viewer {
-        height: 90vh;
-        /* Full viewport height */
-        width: 90vw;
-        /* Full viewport width */
-      }
-
-      #toc {
-        height: 0vh;
-        display: none !important;
-      }
-
-      .back-button {
-        display: none !important;
-      }
-      .arrow {
-        position: fixed;
-        top: 50%;
-        transform: translateY(-50%);
-      }
-
-      #prev {
-        left: 10px;
-      }
-
-      #next {
-        right: 10px;
-      }
-    }
-  </style>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#18281f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+  <link rel="stylesheet" type="text/css" href="semantic.min.css">
+  <link rel="stylesheet" type="text/css" href="reader.css">
+  <script defer src="jszip.min.js"></script>
+  <script defer src="epub.js"></script>
+  <script defer src="pwa.js"></script>
+  <script defer src="reader.js"></script>
 </head>
 
 <body>
-  <select id="toc"></select>
-  <button id="backButton" class="back-button">Back</button>
+  <div class="reader-app theme-paper" id="readerApp">
+    <main class="reader-stage" aria-label="EPUB reader">
+      <div class="viewer-frame">
+        <div id="viewer"></div>
+      </div>
 
-  <div id="viewer" class="spreads"></div>
-  <a id="prev" href="#prev" class="arrow">‹</a>
-  <a id="next" href="#next" class="arrow">›</a>
+      <div class="reader-top-actions hidden" id="progressActions" hidden>
+        <a class="ui button action-button" href="index.html" id="closeBookButton">Close book</a>
+      </div>
 
-  <script>
+      <section class="loading-card" id="loadingCard" aria-live="polite">
+        <p class="eyebrow">Reading now</p>
+        <div class="reader-wordmark"><span class="brand-kicker">Dysli</span>bria</div>
+        <h1 id="loadingTitle">Opening book…</h1>
+        <p class="reader-subtitle" id="loadingMeta">Preparing reader shell</p>
+      </section>
+    </main>
 
-    document.getElementById("backButton").addEventListener("click", function () {
-      window.history.back();
-    });
+    <aside class="progress-panel" id="progressPanel" aria-hidden="true">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Reading progress</p>
+          <h2 id="progressTitle">Opening book…</h2>
+          <p class="reader-subtitle" id="progressMeta">Finding saved position</p>
+        </div>
+        <button class="text-button" id="closeProgress" type="button">Close</button>
+      </div>
 
-    document.addEventListener("DOMContentLoaded", function () {
-      var params = URLSearchParams && new URLSearchParams(document.location.search.substring(1));
-      var url = params && params.get("file") && decodeURIComponent(params.get("file"));
-      var currentSectionIndex = (params && params.get("loc")) ? params.get("loc") : undefined;
+      <section class="status-card">
+        <div class="progress-row">
+          <strong id="progressLabel">0%</strong>
+          <span id="chapterLabel">Loading chapter data…</span>
+        </div>
+        <div class="progress-track" aria-hidden="true">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <p class="reader-subtitle progress-detail" id="progressDetail">Reading progress saves automatically.</p>
+      </section>
+    </aside>
 
-      if (!url) {
-        alert('No EPUB file specified.');
-        return;
-      }
+    <aside class="settings-panel" id="settingsPanel" aria-hidden="true">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Display</p>
+          <div class="reader-wordmark panel-wordmark"><span class="brand-kicker">Dysli</span>bria</div>
+          <h1 id="bookTitle">Opening book…</h1>
+          <p class="reader-subtitle" id="bookMeta">Preparing reader shell</p>
+        </div>
+        <button class="text-button" id="closeSettings" type="button">Close</button>
+      </div>
 
-      var book = ePub(`/epub/${url}`);
-      var isMobile = window.matchMedia("only screen and (max-width: 760px)").matches;
-      var rendition = book.renderTo("viewer", {
-        width: isMobile ? '90vw' : '100%',
-        height: isMobile ? '90vh' : 600,
-        spread: isMobile ? "none" : "always"
-      });
+      <div class="panel-actions">
+        <button class="ui button action-button hidden" id="installButton" type="button" hidden>Install app</button>
+      </div>
 
-      // This function checks the viewport width and adds or removes the class accordingly
-      function checkViewport() {
-        const viewer = document.getElementById('viewer');
-        if (window.innerWidth <= 760) {
-          viewer.classList.remove('spreads');
-        } else {
-          viewer.classList.add('spreads');
-        }
-      }
+      <div class="settings-grid">
+        <label class="setting-field">
+          <span>Theme</span>
+          <select id="themeSelect">
+            <option value="paper">Paper</option>
+            <option value="sepia">Sepia</option>
+            <option value="midnight">Midnight</option>
+          </select>
+        </label>
 
-      // Attach the function to the window resize event
-      window.addEventListener('resize', checkViewport);
+        <label class="setting-field">
+          <span>Font family</span>
+          <select id="fontFamilySelect">
+            <option value="accessible">Accessible sans</option>
+            <option value="serif">Bookish serif</option>
+            <option value="classic">Classic sans</option>
+          </select>
+        </label>
 
-      // Call the function on initial load
-      checkViewport();
+        <label class="setting-field">
+          <span>Font size <strong id="fontSizeValue">110%</strong></span>
+          <input id="fontSizeInput" type="range" min="90" max="160" step="5" value="110">
+        </label>
 
-      /*
-            rendition.themes.default({
-              'h1': {
-                'font-family': "'Quicksand', sans-serif",
-                'font-weight': '700'
-              },
-              'h2': {
-                'font-family': "'Quicksand', sans-serif",
-                'font-weight': '600'
-              },
-              'p': {
-                'font-family': "'Quicksand', sans-serif !important;",
-                'font-weight': '400 !important;',
-                'font-size': '0.9em !important;'
-              },
-              'b': {
-                'font-family': "'Quicksand', sans-serif !important;",
-                'font-weight': '600 !important;',
-                'font-size': '0.95em !important;'
-              }
-            });
-            */
+        <label class="setting-field">
+          <span>Line height <strong id="lineHeightValue">1.6</strong></span>
+          <input id="lineHeightInput" type="range" min="1.3" max="2" step="0.1" value="1.6">
+        </label>
 
-      function saveReadingPosition(book, location) {
-        var bookInfo = {
-          title: book.package.metadata.title,
-          author: book.package.metadata.creator,
-          location: location
-        };
-        localStorage.setItem(url, JSON.stringify(bookInfo));
-      }
+        <label class="setting-field">
+          <span>Page spread</span>
+          <select id="layoutSelect">
+            <option value="auto">Auto</option>
+            <option value="always">Always show spreads</option>
+            <option value="none">Single page only</option>
+          </select>
+        </label>
 
-      function loadReadingPosition(book) {
-        var bookInfo = JSON.parse(localStorage.getItem(url));
-        if (bookInfo && bookInfo.location) {
-          rendition.display(bookInfo.location);
-        } else {
-          rendition.display(currentSectionIndex);
-        }
-      }
+        <label class="setting-field">
+          <span>Reading mode</span>
+          <select id="flowSelect">
+            <option value="paginated">Paginated</option>
+            <option value="scrolled-doc">Continuous scroll</option>
+          </select>
+        </label>
+      </div>
 
-      rendition.display(currentSectionIndex);
+      <section class="toc-section">
+        <div class="section-heading">
+          <h2>Contents</h2>
+        </div>
+        <nav class="toc-tree" id="tocList" aria-label="Table of contents"></nav>
+      </section>
+    </aside>
 
-      book.ready.then(function () {
-        var next = document.getElementById("next");
-        next.addEventListener("click", function (e) {
-          book.package.metadata.direction === "rtl" ? rendition.prev() : rendition.next();
-          e.preventDefault();
-        }, false);
-
-        var prev = document.getElementById("prev");
-        prev.addEventListener("click", function (e) {
-          book.package.metadata.direction === "rtl" ? rendition.next() : rendition.prev();
-          e.preventDefault();
-        }, false);
-
-        var keyListener = function (e) {
-          if ((e.keyCode || e.which) == 37) {
-            book.package.metadata.direction === "rtl" ? rendition.next() : rendition.prev();
-          }
-          if ((e.keyCode || e.which) == 39) {
-            book.package.metadata.direction === "rtl" ? rendition.prev() : rendition.next();
-          }
-        };
-
-        document.addEventListener("keyup", keyListener, false);
-        rendition.on("keyup", keyListener);
-
-        rendition.on("relocated", function (location) {
-          saveReadingPosition(book, location.start.cfi);
-        });
-      });
-
-      window.addEventListener('resize', function () {
-        var isMobileNow = window.matchMedia("only screen and (max-width: 760px)").matches;
-        rendition.setSpread(isMobileNow ? "none" : "always");
-        rendition.resize(isMobileNow ? '90vw' : '100%', isMobileNow ? '90vh' : 600);
-      });
-
-      book.loaded.navigation.then(function (toc) {
-        var $select = document.getElementById("toc"), docfrag = document.createDocumentFragment();
-        toc.forEach(function (chapter) {
-          var option = document.createElement("option");
-          option.textContent = chapter.label;
-          option.setAttribute("ref", chapter.href);
-          docfrag.appendChild(option);
-        });
-        $select.appendChild(docfrag);
-        $select.onchange = function () {
-          var index = $select.selectedIndex,
-            url = $select.options[index].getAttribute("ref");
-          rendition.display(url);
-          return false;
-        };
-      });
-
-      // Initial load of reading position
-      loadReadingPosition(book);
-    });
-  </script>
+    <div class="reader-scrim" id="readerScrim"></div>
+  </div>
 </body>
 
 </html>

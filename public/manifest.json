@@ -1,23 +1,25 @@
 {
-    "short_name": "Dyslibria",
-    "name": "Dyslibria - Reading made easy",
-    "icons": [
-      {
-        "src": "icons/icon-192x192.png",
-        "type": "image/png",
-        "sizes": "192x192"
-      },
-      {
-        "src": "icons/icon-512x512.png",
-        "type": "image/png",
-        "sizes": "512x512"
-      }
-    ],
-    "start_url": "/login",
-    "background_color": "#FFFFFF",
-    "display": "fullscreen",
-    "scope": "/",
-    "theme_color": "#202021",
-    "orientation": "portrait"
-  }
+  "id": "/authenticated/index.html",
+  "short_name": "Dyslibria",
+  "name": "Dyslibria Reader",
+  "description": "A self-hosted EPUB conversion and reading app with browser, OPDS, and WebDAV access.",
+  "icons": [
+    {
+      "src": "icons/icon-192x192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "icons/icon-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/authenticated/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5efd8",
+  "theme_color": "#18281f",
+  "orientation": "any"
+}
   

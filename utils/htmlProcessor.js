@@ -1,14 +1,19 @@
 const fs = require('fs-extra');
 const path = require('path');
 const cheerio = require('cheerio');
-const sanitizeHtml = require('sanitize-html');
 const { findLongestValidPrefix } = require('./dictionaryUtils');
+
+const SKIPPED_TAGS = new Set(['img', 'script', 'style', 'svg', 'math', 'code', 'pre']);
 
 function processTextNodes($, element, dictionary) {
   $(element).contents().each(function () {
     if (this.type === 'text') {
       // Replace &nbsp; with a regular space
-      let text = $(this).text().replace(/&nbsp;/g, ' ');
+      const text = (this.data || '').replace(/\u00A0/g, ' ');
+
+      if (!text.trim()) {
+        return;
+      }
 
       const processedText = text.replace(/\b([a-zA-Z'-]+)/g, function (word) {
         const prefixLength = findLongestValidPrefix(word, dictionary);
@@ -26,9 +31,12 @@ function processTextNodes($, element, dictionary) {
       });
 
       // Load the processed text into a new cheerio instance to ensure tags are correctly formed
-      const wrappedText = cheerio.load(processedText);
-      $(this).replaceWith(wrappedText.html());
-    } else if (this.type === 'tag' && this.tagName !== 'img') {
+      const wrappedText = cheerio.load(`<root>${processedText}</root>`, {
+        xmlMode: true,
+        decodeEntities: false
+      });
+      $(this).replaceWith(wrappedText('root').html() || '');
+    } else if (this.type === 'tag' && !SKIPPED_TAGS.has((this.tagName || '').toLowerCase())) {
       processTextNodes($, this, dictionary); // Recursively process child nodes, skip images
     }
   });
@@ -50,48 +58,60 @@ function cleanHtml($) {
 
 async function processContent(filePath, dictionary) {
   const content = await fs.readFile(filePath, 'utf-8');
-  const $ = cheerio.load(content, { xmlMode: true });
+  const $ = cheerio.load(content, { xmlMode: true, decodeEntities: false });
+  const body = $('body');
 
-  // Extract the body content
-  const bodyContent = $('body').html();
+  if (body.length) {
+    body.each(function () {
+      processTextNodes($, this, dictionary);
+    });
+  } else if ($.root().children().length) {
+    processTextNodes($, $.root(), dictionary);
+  } else {
+    return { processed: false, reason: 'missing-content' };
+  }
 
-  // Load the body content into a new cheerio instance
-  const body$ = cheerio.load(`<body>${bodyContent}</body>`, { xmlMode: true });
+  cleanHtml($);
 
-  // Process text nodes within the body content
-  body$('p, span, div').each(function () {
-    processTextNodes(body$, this, dictionary);
-  });
-
-  cleanHtml(body$); // Clean up redundant tags
-
-  // Sanitize HTML to remove unnecessary whitespace and ensure well-formedness
-  const sanitizedBody = sanitizeHtml(body$.html(), {
-    allowedTags: false, // Allow all tags
-    allowedAttributes: false, // Allow all attributes
-    allowVulnerableTags: true
-  });
-
-  // Reassemble the final HTML
-  $('body').html(sanitizedBody);
-  const finalHtml = $.html();
-
-  await fs.writeFile(filePath, finalHtml, 'utf-8'); // Save file with the same extension
+  await fs.writeFile(filePath, $.xml(), 'utf-8');
+  return { processed: true };
 }
 
 async function processHtmlFiles(dir, dictionary) {
-  const files = await fs.readdir(dir);
+  const result = {
+    processedFiles: 0,
+    skippedFiles: 0,
+    errors: []
+  };
+
+  const files = await fs.readdir(dir, { withFileTypes: true });
 
   for (const file of files) {
-    const filePath = path.join(dir, file);
-    const stat = await fs.stat(filePath);
+    const filePath = path.join(dir, file.name);
 
-    if (stat.isDirectory()) {
-      await processHtmlFiles(filePath, dictionary);
-    } else if (file.endsWith('.html') || file.endsWith('.xhtml')) {
-      await processContent(filePath, dictionary);
+    if (file.isDirectory()) {
+      const nestedResult = await processHtmlFiles(filePath, dictionary);
+      result.processedFiles += nestedResult.processedFiles;
+      result.skippedFiles += nestedResult.skippedFiles;
+      result.errors.push(...nestedResult.errors);
+    } else if (/\.(html|xhtml)$/i.test(file.name)) {
+      try {
+        const processedResult = await processContent(filePath, dictionary);
+        if (processedResult.processed) {
+          result.processedFiles += 1;
+        } else {
+          result.skippedFiles += 1;
+        }
+      } catch (error) {
+        result.errors.push({
+          filePath,
+          message: error.message
+        });
+      }
     }
   }
+
+  return result;
 }
 
 module.exports = {

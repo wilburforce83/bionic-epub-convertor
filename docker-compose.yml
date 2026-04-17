@@ -3,15 +3,29 @@ services:
   app:
     build: .
     ports:
-      - "3000:3000"  # Map TCP port 3000 in the container to port 3000 on the Docker host.
+      - "3000:3000"
+      - "1900:1900"
     volumes:
-      - ./uploads:/usr/src/app/uploads  # Mount host's `uploads` directory to container's `/usr/src/app/uploads`
-      - ./processed:/usr/src/app/processed  # Mount host's `processed` directory to container's `/usr/src/app/processed`
+      - ./uploads:/usr/src/app/uploads
+      - ./processed:/usr/src/app/processed
+      - ./db:/usr/src/app/db
+      - ./failed:/usr/src/app/failed
     environment:
-      - MAIN_PORT=3000
-      - WEBDAV_PORT=1900
-      - BASE_URL=http://localhost:3000 # Must match URL and EXTERNAL facing port for opds server default is localhost:+MAIN_PORT
-      - WEBDAV_USERNAME=dys
-      - WEBDAV_PASSWORD=password
-      - NODE_ENV=production
-    restart: on-failure
+      MAIN_PORT: 3000
+      WEBDAV_PORT: 1900
+      BASE_URL: ${BASE_URL:-http://localhost:3000}
+      WEBDAV_USERNAME: ${WEBDAV_USERNAME}
+      WEBDAV_PASSWORD: ${WEBDAV_PASSWORD}
+      SESSION_SECRET: ${SESSION_SECRET}
+      NODE_ENV: production
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:' + (process.env.MAIN_PORT || 3000) + '/healthz').then((res) => { process.exit(res.ok ? 0 : 1); }).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    restart: unless-stopped

@@ -1,20 +1,15 @@
-# Use an official Node.js runtime as a parent image
-FROM node:16
+FROM node:20-bookworm-slim
 
-# Set the working directory in the container
 WORKDIR /usr/src/app
 
-# Install dependencies
-# A wildcard is used to ensure both package.json AND package-lock.json are copied
 COPY package*.json ./
+RUN npm ci --omit=dev
 
-RUN npm install
-
-# Bundle app source inside Docker image
 COPY . .
 
-# Expose the port the app runs on
 EXPOSE 3000
+EXPOSE 1900
 
-# Run the application
-CMD ["node", "server.js"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD node -e "fetch('http://127.0.0.1:' + (process.env.MAIN_PORT || 3000) + '/healthz').then((res) => { process.exit(res.ok ? 0 : 1); }).catch(() => process.exit(1))"
+
+CMD ["npm", "start"]
