@@ -3,61 +3,145 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Dyslibria Login</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css">
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#202021">
+  <meta name="theme-color" content="#93381f">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <script defer src="/app-theme.js"></script>
 
   <style>
-    body,
-    html {
-      height: 100%;
+    :root {
+      --login-accent: var(--app-accent, #d05834);
+      --login-accent-strong: var(--app-accent-strong, #93381f);
+      --login-accent-soft: var(--app-accent-soft, #f29b80);
+      --login-accent-rgb: var(--app-accent-rgb, 208, 88, 52);
+      --login-surface: rgba(29, 23, 21, 0.94);
+      --login-panel: rgba(36, 29, 27, 0.96);
+      --login-border: rgba(255, 220, 206, 0.08);
+      --login-text: #f7eee8;
+      --login-muted: #c8b5ac;
+      --ui-radius: 0.5rem;
+      --heading-font: "Lato", "Helvetica Neue", Arial, Helvetica, sans-serif;
+      --body-font: "Avenir Next", "Segoe UI", "Trebuchet MS", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
       margin: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      background:
+        radial-gradient(circle at top left, rgba(var(--login-accent-rgb), 0.28), transparent 34%),
+        radial-gradient(circle at bottom right, rgba(var(--login-accent-rgb), 0.16), transparent 30%),
+        linear-gradient(180deg, #171312 0%, #221c1a 100%);
+      color: var(--login-text);
+      font-family: var(--body-font);
     }
 
-    .centered-container {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100%;
+    body {
+      display: grid;
+      place-items: center;
+      padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
     }
 
-    .ui.container {
-      max-width: 400px;
+    .login-shell {
+      width: min(100%, 28rem);
+    }
+
+    .login-card {
+      border: 1px solid var(--login-border);
+      border-radius: var(--ui-radius);
+      background: var(--login-panel);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
+      padding: 1.5rem;
+      backdrop-filter: blur(14px);
+    }
+
+    .eyebrow {
+      margin: 0 0 0.55rem;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      font-size: 0.72rem;
+      color: var(--login-muted);
+    }
+
+    .brand {
+      margin: 0 0 1.2rem;
+      font-family: var(--heading-font);
+      font-size: clamp(2.25rem, 6vw, 3.4rem);
+      line-height: 0.95;
+      font-weight: 300;
+      letter-spacing: -0.04em;
+      color: var(--login-text);
+    }
+
+    .brand-kicker {
+      color: var(--login-accent);
+      font-weight: 600;
+    }
+
+    .login-copy {
+      margin: 0 0 1.4rem;
+      color: var(--login-muted);
+      line-height: 1.6;
+    }
+
+    .ui.form .field > label {
+      color: var(--login-muted);
+      font-weight: 600;
+      margin-bottom: 0.45rem;
+    }
+
+    .ui.form input[type="text"],
+    .ui.form input[type="password"] {
+      min-height: 3rem;
+      border-radius: 0.28571429rem;
+      border: 1px solid var(--login-border);
+      background: var(--login-surface);
+      color: var(--login-text);
+    }
+
+    .ui.form input::placeholder {
+      color: var(--login-muted);
+    }
+
+    .login-button.ui.button {
+      width: 100%;
+      min-height: 3rem;
+      margin-top: 0.5rem;
+      border-radius: 0.28571429rem;
+      background: var(--login-accent);
+      color: var(--app-accent-contrast, #fff8f4);
     }
   </style>
 </head>
 
 <body>
-  <div class="centered-container">
-    <div class="ui container">
+  <main class="login-shell">
+    <section class="login-card">
+      <p class="eyebrow">Accessible self-hosted library</p>
+      <h1 class="brand"><span class="brand-kicker">Dysli</span>bria</h1>
+      <p class="login-copy">Sign in to manage your library, resume your place, and keep EPUB conversion running in one place.</p>
 
-      <div class="ui center aligned padded segment">
-        <h2 class="ui center aligned icon header">
-          <i class="book icon"></i>
-          <span style="font-weight: 300;"><span style="font-weight: 600;">Dysli</span>bria</span>
-        </h2>
-        <form class="ui form" method="post" action="/login">
-          <div class="field">
-            <label><span style="font-weight: 300;"><span style="font-weight: 600;">User</span>name</span></label>
-            <input type="text" name="username" placeholder="Username" required>
-          </div>
-          <div class="field">
-            <label><span style="font-weight: 300;"><span style="font-weight: 600;">Pass</span>word</span></label>
-            <input type="password" name="password" placeholder="Password" required>
-          </div>
-          <button class="ui button" type="submit"><span style="font-weight: 300;"><span
-                style="font-weight: 600;">Log</span>in</span></button>
-        </form>
-      </div>
-    </div>
-  </div>
+      <form class="ui form" method="post" action="/login">
+        <div class="field">
+          <label for="username">Username</label>
+          <input id="username" type="text" name="username" placeholder="Username" required autocomplete="username">
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" type="password" name="password" placeholder="Password" required autocomplete="current-password">
+        </div>
+        <button class="ui button login-button" type="submit">Log in</button>
+      </form>
+    </section>
+  </main>
 
   <script>
     function getRegistrationScriptUrl(registration) {
@@ -68,6 +152,33 @@
         ''
       );
     }
+
+    function applyAppThemeConfig(payload) {
+      if (!window.DyslibriaTheme || !payload) {
+        return;
+      }
+
+      const palette = window.DyslibriaTheme.applyPalette(payload.themeColor || window.DyslibriaTheme.DEFAULT_COLOR_KEY);
+      document.querySelector('meta[name="theme-color"]')
+        .setAttribute('content', window.DyslibriaTheme.getMetaThemeColor('dark', palette));
+    }
+
+    fetch('/api/app-config')
+      .then(function(response) {
+        if (!response.ok) {
+          throw new Error('Unable to load app config');
+        }
+
+        return response.json();
+      })
+      .then(applyAppThemeConfig)
+      .catch(function() {
+        if (window.DyslibriaTheme) {
+          const palette = window.DyslibriaTheme.applyPalette(window.DyslibriaTheme.DEFAULT_COLOR_KEY);
+          document.querySelector('meta[name="theme-color"]')
+            .setAttribute('content', window.DyslibriaTheme.getMetaThemeColor('dark', palette));
+        }
+      });
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations()
@@ -83,7 +194,7 @@
             })
             .map(function(registration) {
               return registration.unregister();
-          }));
+            }));
         })
         .then(function() {
           if ('caches' in window) {
@@ -102,7 +213,6 @@
         });
     }
   </script>
-  
 </body>
 
 </html>

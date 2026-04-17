@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Dyslibria Library</title>
   <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#18281f">
+  <meta name="theme-color" content="#93381f">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
@@ -14,12 +14,13 @@
   <link rel="stylesheet" type="text/css" href="library.css">
   <script defer src="jquery.js"></script>
   <script defer src="semantic.min.js"></script>
+  <script defer src="/app-theme.js"></script>
   <script defer src="pwa.js"></script>
   <script defer src="library.js"></script>
 </head>
 
-<body>
-  <div class="library-app">
+<body class="theme-dark">
+  <div class="library-app theme-dark" id="libraryApp">
     <header class="library-header">
       <div class="brand-block">
         <p class="eyebrow">Accessible self-hosted library</p>
@@ -29,21 +30,44 @@
       </div>
 
       <div class="toolbar-shell">
-        <label class="search-shell" for="searchBar">
-          <i class="search icon" aria-hidden="true"></i>
-          <input type="text" id="searchBar" placeholder="Search by title or author" autocomplete="off">
-        </label>
+        <div class="toolbar-row">
+          <label class="search-shell" for="searchBar">
+            <i class="search icon" aria-hidden="true"></i>
+            <input type="text" id="searchBar" placeholder="Search by title or author" autocomplete="off">
+          </label>
 
-        <div class="toolbar-actions">
+          <div class="toolbar-utility">
+            <div class="status-pill" id="conversionStatus" role="status" aria-live="polite">
+              <span class="status-dot" id="conversionStatusDot" aria-hidden="true"></span>
+              <span id="conversionStatusText">Checking converter…</span>
+            </div>
+
+            <button class="ui button app-button ghost mobile-menu-button" id="menuToggle" type="button"
+              aria-expanded="false" aria-controls="toolbarActions">
+              <i class="bars icon" aria-hidden="true"></i>
+              <span>Menu</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="toolbar-actions" id="toolbarActions">
+          <button class="ui button app-button ghost" id="themeToggle" type="button">
+            <i class="moon icon" id="themeToggleIcon" aria-hidden="true"></i>
+            <span id="themeToggleText">Dark theme</span>
+          </button>
           <button class="ui button app-button ghost hidden" id="installButton" type="button" hidden>
             <i class="download icon" aria-hidden="true"></i>
             <span>Install</span>
+          </button>
+          <button class="ui button app-button ghost" id="viewLogsButton" type="button">
+            <i class="file alternate outline icon" aria-hidden="true"></i>
+            <span id="viewLogsLabel">Logs</span>
           </button>
           <button class="ui button app-button ghost" id="updateDatabaseButton" type="button">
             <i class="sync alternate icon" aria-hidden="true"></i>
             <span>Refresh</span>
           </button>
-          <button class="ui olive button app-button accent" id="uploadButton" type="button">
+          <button class="ui button app-button accent" id="uploadButton" type="button">
             <i class="upload icon" aria-hidden="true"></i>
             <span>Upload</span>
           </button>
@@ -56,24 +80,62 @@
     </header>
 
     <main class="library-main">
-      <section class="hero-panel">
-        <div>
-          <p class="eyebrow">Read without the clutter</p>
-          <h1>Converted EPUBs, cleaner reading, one shelf.</h1>
-          <p class="hero-copy">
-            Upload EPUB files, keep the bionic conversion pipeline, and read directly in a responsive web app that
-            works well on desktop, tablet, and mobile.
-          </p>
+      <section class="hero-shell" id="heroShell">
+        <div class="hero-header">
+          <div>
+            <p class="eyebrow">Library deck</p>
+            <h1>Your next session is one tap away.</h1>
+          </div>
+
+          <button class="ui button app-button ghost hero-toggle" id="heroToggle" type="button"
+            aria-expanded="true" aria-controls="heroPanel">
+            <i class="angle up icon" id="heroToggleIcon" aria-hidden="true"></i>
+            <span id="heroToggleLabel">Collapse banner</span>
+          </button>
         </div>
 
-        <div class="hero-aside">
-          <div class="stat-chip">
-            <span class="stat-label">Library size</span>
-            <strong id="libraryCount">0 books</strong>
-          </div>
-          <div class="stat-chip muted">
-            <span class="stat-label">Tip</span>
-            <span>Tap any cover to open the reader and resume where you left off.</span>
+        <div class="hero-panel" id="heroPanel">
+          <article class="feature-card continue-card">
+            <p class="eyebrow">Continue reading</p>
+            <h2 id="continueTitle">Nothing in progress yet</h2>
+            <p class="feature-copy" id="continueMeta">
+              Open any book and Dyslibria will save your place automatically so you can jump back in later.
+            </p>
+
+            <div class="feature-progress" id="continueProgressShell" hidden>
+              <div class="progress-track" aria-hidden="true">
+                <div class="progress-fill" id="continueProgressFill"></div>
+              </div>
+              <div class="feature-progress-meta">
+                <strong id="continueProgressLabel">0%</strong>
+                <span id="continueProgressDetail">Waiting for first session</span>
+              </div>
+            </div>
+
+            <div class="feature-actions">
+              <button class="ui button app-button accent" id="continueButton" type="button" disabled>Resume</button>
+              <span class="meta-pill" id="continueUpdated">No saved session yet</span>
+            </div>
+          </article>
+
+          <div class="hero-aside">
+            <article class="stat-chip">
+              <span class="stat-label">Library size</span>
+              <strong id="libraryCount">0 books</strong>
+              <p id="libraryMeta">Search stays visible so you can jump straight to a title.</p>
+            </article>
+
+            <article class="stat-chip">
+              <span class="stat-label">Converter</span>
+              <strong id="heroStatusText">Checking converter…</strong>
+              <p id="heroStatusMeta">Fetching current queue details.</p>
+            </article>
+
+            <article class="stat-chip tip-card">
+              <span class="stat-label">Tip</span>
+              <strong id="tipTitle">Reader controls</strong>
+              <p id="tipText">Tap the left and right edges to turn pages. Tap the middle to open display settings.</p>
+            </article>
           </div>
         </div>
       </section>
@@ -99,7 +161,7 @@
           <input type="file" name="epubFiles" id="epubFiles" accept=".epub" multiple>
         </div>
         <div class="drop-zone" id="dropZone">Drag EPUB files here or click to choose them</div>
-        <button class="ui olive button" type="submit">Convert and add to library</button>
+        <button class="ui button app-button accent" type="submit">Convert and add to library</button>
       </form>
     </div>
   </div>
@@ -130,12 +192,30 @@
           <label>External base URL</label>
           <input type="text" name="baseUrl" placeholder="https://your-domain.example">
         </div>
+        <div class="field">
+          <label>Theme colour</label>
+          <select name="themeColor" id="themeColorSelect"></select>
+        </div>
       </form>
     </div>
     <div class="actions">
       <button class="ui button" id="cancelSettingsButton" type="button">Cancel</button>
-      <button class="ui olive button" id="saveSettingsButton" type="button">Save</button>
+      <button class="ui button app-button accent" id="saveSettingsButton" type="button">Save</button>
       <button class="ui basic button" id="restartServerButton" type="button">Restart server</button>
+    </div>
+  </div>
+
+  <div class="ui large modal" id="logsModal">
+    <div class="header">Conversion log</div>
+    <div class="content">
+      <div class="logs-toolbar">
+        <span class="logs-meta" id="logsMeta">No log entries yet.</span>
+        <button class="ui basic button" id="clearLogsButton" type="button">Clear logs</button>
+      </div>
+      <pre class="logs-output" id="logsOutput">No conversion logs yet.</pre>
+    </div>
+    <div class="actions">
+      <button class="ui button" id="closeLogsButton" type="button">Close</button>
     </div>
   </div>
 </body>

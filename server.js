@@ -84,6 +84,34 @@ function readConfigValue(envKey, dbKey) {
   return process.env[envKey] || (dbKey && db.has(dbKey) ? db.get(dbKey) : '');
 }
 
+const THEME_COLOR_OPTIONS = [
+  { key: 'ember', label: 'Ember', hex: '#d05834' },
+  { key: 'cobalt', label: 'Cobalt', hex: '#4668df' },
+  { key: 'teal', label: 'Teal', hex: '#0f8c7c' },
+  { key: 'gold', label: 'Gold', hex: '#b77a22' },
+  { key: 'plum', label: 'Plum', hex: '#8f55b6' }
+];
+const THEME_COLOR_MAP = Object.fromEntries(THEME_COLOR_OPTIONS.map((option) => [option.key, option]));
+const DEFAULT_THEME_COLOR = 'ember';
+
+function normalizeThemeColorKey(value) {
+  const normalizedValue = String(value || '').trim().toLowerCase();
+  return THEME_COLOR_MAP[normalizedValue] ? normalizedValue : DEFAULT_THEME_COLOR;
+}
+
+function getThemeColorSetting() {
+  return normalizeThemeColorKey(readConfigValue('THEME_COLOR', 'themeColor'));
+}
+
+function getPublicAppConfig() {
+  return {
+    success: true,
+    defaultThemeMode: 'dark',
+    themeColor: getThemeColorSetting(),
+    themeColors: THEME_COLOR_OPTIONS
+  };
+}
+
 const uploadsDir = resolveDirectorySetting(
   readConfigValue('UPLOAD_PATH', 'uploadPath'),
   defaultUploadsDir,
@@ -343,8 +371,34 @@ const queuedUploadPaths = new Set();
 const queuedOutputFilenames = new Set();
 const watcherIgnoredPaths = new Set();
 const fileQueue = [];
+const conversionLogs = [];
 let isProcessing = false;
 let dictionaryPromise = null;
+
+function appendConversionLog(level, message) {
+  conversionLogs.push({
+    id: uuidv4(),
+    level,
+    message,
+    timestamp: new Date().toISOString()
+  });
+
+  if (conversionLogs.length > 250) {
+    conversionLogs.splice(0, conversionLogs.length - 250);
+  }
+}
+
+function getRuntimeStatus() {
+  return {
+    processing: isProcessing,
+    queueLength: fileQueue.length,
+    logs: conversionLogs.slice().reverse()
+  };
+}
+
+async function getMetadataReady() {
+  return fs.pathExists(path.join(rootDir, 'db', 'epubData.json'));
+}
 
 async function ensureDirectoriesExist() {
   await fs.ensureDir(uploadsDir);
@@ -427,6 +481,8 @@ function enqueueFile(job) {
     void processNextFile();
   }
 
+  appendConversionLog('info', `Queued ${job.outputFilename} for conversion.`);
+
   return true;
 }
 
@@ -448,6 +504,7 @@ async function processEpubJob(job) {
 
   try {
     console.log(`Starting to process EPUB file: ${job.uploadPath}`);
+    appendConversionLog('info', `Starting conversion for ${job.outputFilename}.`);
 
     await ensureDirectoriesExist();
     await fs.emptyDir(resourcesDir);
@@ -474,8 +531,10 @@ async function processEpubJob(job) {
     await fs.move(tempOutputPath, finalOutputPath, { overwrite: true });
     await extractEpubData(processedDir);
     console.log(`Successfully processed: ${job.uploadPath}`);
+    appendConversionLog('success', `Finished converting ${job.outputFilename}.`);
   } catch (error) {
     console.error(`Error processing EPUB ${job.uploadPath}: ${error.message}`, error);
+    appendConversionLog('error', `Failed converting ${job.outputFilename}: ${error.message}`);
     await fs.remove(tempOutputPath);
     await quarantineFailedUpload(job);
     quarantined = true;
@@ -530,6 +589,7 @@ async function handleWatchedUpload(filePath) {
     uploadPath: filePath,
     outputFilename
   });
+  appendConversionLog('info', `Detected new upload ${path.basename(filePath)}.`);
 }
 
 function startUploadsWatcher() {
@@ -631,13 +691,16 @@ function normalizeSettingsUpdate(payload) {
     updates.baseUrl = normalizeBaseUrl(payload.baseUrl);
   }
 
+  if (payload.themeColor !== undefined) {
+    updates.themeColor = normalizeThemeColorKey(payload.themeColor);
+  }
+
   return updates;
 }
 
 // Basic route to serve the login page
 app.get('/healthz', async (req, res) => {
-  const metadataPath = path.join(rootDir, 'db', 'epubData.json');
-  const metadataReady = await fs.pathExists(metadataPath);
+  const metadataReady = await getMetadataReady();
 
   res.json({
     status: 'ok',
@@ -645,6 +708,35 @@ app.get('/healthz', async (req, res) => {
     queueLength: fileQueue.length,
     metadataReady
   });
+});
+
+app.get('/api/app-config', (req, res) => {
+  res.json(getPublicAppConfig());
+});
+
+app.get('/api/system-status', isAuthenticated, async (req, res) => {
+  const metadataReady = await getMetadataReady();
+  const runtimeStatus = getRuntimeStatus();
+  res.json({
+    success: true,
+    metadataReady,
+    processing: runtimeStatus.processing,
+    queueLength: runtimeStatus.queueLength,
+    logCount: runtimeStatus.logs.length,
+    latestLog: runtimeStatus.logs[0] || null
+  });
+});
+
+app.get('/api/conversion-logs', isAuthenticated, (req, res) => {
+  res.json({
+    success: true,
+    logs: getRuntimeStatus().logs
+  });
+});
+
+app.delete('/api/conversion-logs', isAuthenticated, (req, res) => {
+  conversionLogs.length = 0;
+  res.json({ success: true });
 });
 
 app.get('/login', (req, res) => {
@@ -723,6 +815,22 @@ app.get('/epub/:filename', requireCatalogAuth, async (req, res) => {
   });
 });
 
+app.get('/api/reading-progress', isAuthenticated, (req, res) => {
+  const userId = getReadingProgressUser(req);
+  const entries = Object.values(readingProgressDb.JSON())
+    .filter((entry) => entry && entry.userId === userId && entry.filename)
+    .sort((left, right) => {
+      const leftTime = Date.parse(left.updatedAt || 0) || 0;
+      const rightTime = Date.parse(right.updatedAt || 0) || 0;
+      return rightTime - leftTime;
+    });
+
+  res.json({
+    success: true,
+    progress: entries
+  });
+});
+
 app.get('/api/reading-progress/:filename', isAuthenticated, (req, res) => {
   const filename = sanitizeEpubFilename(req.params.filename);
 
@@ -770,10 +878,13 @@ app.post('/api/reading-progress/:filename', isAuthenticated, async (req, res) =>
 // Route to update the EPUB database
 app.post('/update-database', isAuthenticated, async (req, res) => {
   try {
+    appendConversionLog('info', 'Manual library refresh requested.');
     await extractEpubData(processedDir);
+    appendConversionLog('success', 'Library metadata refresh completed.');
     res.json({ success: true });
   } catch (err) {
     console.error('Error updating database:', err);
+    appendConversionLog('error', `Library refresh failed: ${err.message}`);
     res.status(500).json({ success: false, message: 'Error updating database.' });
   }
 });
@@ -818,6 +929,7 @@ app.post('/upload', isAuthenticated, async (req, res) => {
     }
   } catch (err) {
     console.error('Error handling uploaded EPUB file:', err);
+    appendConversionLog('error', `Upload rejected: ${err.message || 'Invalid EPUB file.'}`);
 
     for (const epubFile of epubFiles) {
       if (epubFile.tempFilePath) {
@@ -839,6 +951,7 @@ app.post('/upload', isAuthenticated, async (req, res) => {
     message: 'EPUB files uploaded successfully.',
     queuedFiles
   });
+  appendConversionLog('info', `Accepted ${queuedFiles.length} upload${queuedFiles.length === 1 ? '' : 's'} into the conversion queue.`);
 });
 
 // Route to get settings
@@ -849,7 +962,9 @@ app.get('/settings', isAuthenticated, (req, res) => {
       opdsPort: String(PORT),
       uploadPath: uploadsDir,
       libraryPath: processedDir,
-      baseUrl: configuredBaseUrl
+      baseUrl: configuredBaseUrl,
+      themeColor: getThemeColorSetting(),
+      themeColors: THEME_COLOR_OPTIONS
     });
   } catch (err) {
     console.error('Error fetching settings:', err);
@@ -862,13 +977,15 @@ app.post('/settings', isAuthenticated, (req, res) => {
   try {
     const currentSettings = db.JSON();
     const updates = normalizeSettingsUpdate(req.body);
+    const restartSensitiveKeys = ['webdavPort', 'opdsPort', 'uploadPath', 'libraryPath', 'baseUrl'];
+    const requiresRestart = Object.keys(updates).some((key) => restartSensitiveKeys.includes(key));
 
     db.JSON({
       ...currentSettings,
       ...updates
     });
     db.sync();
-    res.json({ success: true, requiresRestart: true });
+    res.json({ success: true, requiresRestart });
   } catch (err) {
     console.error('Error updating settings:', err);
     res.status(400).json({ success: false, message: err.message || 'Error updating settings.' });

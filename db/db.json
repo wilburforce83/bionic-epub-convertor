@@ -1,4 +1,8 @@
 {
-    "webdavPort": "1900",
-    "opdsPort": "3000"
+    "webdavPort": "1901",
+    "opdsPort": "3100",
+    "uploadPath": "/Users/wilbur/Projects/bionic-epub-convertor/uploads",
+    "libraryPath": "/Users/wilbur/Projects/bionic-epub-convertor/processed",
+    "baseUrl": "http://localhost:3100",
+    "themeColor": "ember"
 }

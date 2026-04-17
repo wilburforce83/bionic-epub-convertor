@@ -33,6 +33,10 @@
     }
   };
 
+  let appPalette = window.DyslibriaTheme
+    ? window.DyslibriaTheme.applyPalette(window.DyslibriaTheme.DEFAULT_COLOR_KEY, document.documentElement)
+    : null;
+
   const fontFamilies = {
     accessible: '"Avenir Next", "Segoe UI", "Trebuchet MS", sans-serif',
     serif: '"Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif',
@@ -230,11 +234,48 @@
     elements.lineHeightValue.textContent = Number(settings.lineHeight).toFixed(1);
   }
 
+  async function loadAppConfig() {
+    if (!window.DyslibriaTheme) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/app-config', {
+        credentials: 'same-origin'
+      });
+
+      if (!response.ok) {
+        throw new Error(`Theme config lookup failed (${response.status})`);
+      }
+
+      const payload = await response.json();
+      appPalette = window.DyslibriaTheme.applyPalette(
+        payload.themeColor || window.DyslibriaTheme.DEFAULT_COLOR_KEY,
+        document.documentElement
+      );
+    } catch (error) {
+      appPalette = window.DyslibriaTheme.applyPalette(
+        window.DyslibriaTheme.DEFAULT_COLOR_KEY,
+        document.documentElement
+      );
+    }
+  }
+
   function applyShellTheme() {
     elements.app.classList.remove('theme-paper', 'theme-sepia', 'theme-midnight');
     elements.app.classList.add(`theme-${settings.theme}`);
-    document.querySelector('meta[name="theme-color"]')
-      .setAttribute('content', settings.theme === 'midnight' ? '#0f1620' : '#18281f');
+
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) {
+      if (window.DyslibriaTheme && appPalette) {
+        metaTheme.setAttribute(
+          'content',
+          window.DyslibriaTheme.getMetaThemeColor(settings.theme === 'midnight' ? 'dark' : 'light', appPalette)
+        );
+      } else {
+        metaTheme.setAttribute('content', settings.theme === 'midnight' ? '#0f1620' : '#18281f');
+      }
+    }
   }
 
   function updateOverlayState() {
@@ -482,7 +523,13 @@
       return;
     }
 
-    const theme = pageThemes[settings.theme] || pageThemes.paper;
+    const baseTheme = pageThemes[settings.theme] || pageThemes.paper;
+    const theme = {
+      ...baseTheme,
+      link: settings.theme === 'midnight'
+        ? ((appPalette && appPalette.linkDark) || baseTheme.link)
+        : ((appPalette && appPalette.linkLight) || baseTheme.link)
+    };
     const fontFamily = fontFamilies[settings.fontFamily] || fontFamilies.accessible;
 
     rendition.themes.default({
@@ -792,6 +839,7 @@
       return;
     }
 
+    await loadAppConfig();
     updateSettingLabels();
     applyShellTheme();
     attachEventListeners();
