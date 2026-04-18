@@ -4,8 +4,81 @@ const cheerio = require('cheerio');
 const { findLongestValidPrefix } = require('./dictionaryUtils');
 
 const SKIPPED_TAGS = new Set(['img', 'script', 'style', 'svg', 'math', 'code', 'pre']);
+const SAFE_XML_ENTITY_PATTERN = /&(?!(?:#\d+|#x[a-fA-F0-9]+|[a-zA-Z][\w.-]*);)/g;
+const XML_ENTITY_TOKEN_PATTERN = /&(?:#\d+|#x[a-fA-F0-9]+|[a-zA-Z][\w.-]*);/g;
 
-function processTextNodes($, element, dictionary) {
+function escapeXmlTextContent(value) {
+  return String(value || '')
+    .replace(SAFE_XML_ENTITY_PATTERN, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function buildProcessedPlainText(text, dictionary, shouldBold) {
+  if (!shouldBold) {
+    return escapeXmlTextContent(text);
+  }
+
+  let lastIndex = 0;
+  const parts = [];
+  const wordPattern = /\b([a-zA-Z'-]+)/g;
+  let match;
+
+  while ((match = wordPattern.exec(text)) !== null) {
+    const [word] = match;
+    const matchIndex = match.index;
+
+    if (matchIndex > lastIndex) {
+      parts.push(escapeXmlTextContent(text.slice(lastIndex, matchIndex)));
+    }
+
+    const prefixLength = findLongestValidPrefix(word, dictionary);
+    let midpoint = Math.floor(word.length / 2);
+
+    if (midpoint < 1) {
+      midpoint = 1;
+    }
+
+    const boldLength = prefixLength > 0 && prefixLength >= midpoint && word.length > 1
+      ? prefixLength
+      : midpoint;
+
+    parts.push(`<b>${escapeXmlTextContent(word.slice(0, boldLength))}</b>${escapeXmlTextContent(word.slice(boldLength))}`);
+    lastIndex = matchIndex + word.length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(escapeXmlTextContent(text.slice(lastIndex)));
+  }
+
+  return parts.join('');
+}
+
+function buildProcessedText(text, dictionary, shouldBold) {
+  let lastIndex = 0;
+  const parts = [];
+  let match;
+
+  while ((match = XML_ENTITY_TOKEN_PATTERN.exec(text)) !== null) {
+    const entity = match[0];
+    const matchIndex = match.index;
+
+    if (matchIndex > lastIndex) {
+      parts.push(buildProcessedPlainText(text.slice(lastIndex, matchIndex), dictionary, shouldBold));
+    }
+
+    parts.push(entity);
+    lastIndex = matchIndex + entity.length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(buildProcessedPlainText(text.slice(lastIndex), dictionary, shouldBold));
+  }
+
+  return parts.join('');
+}
+
+function processTextNodes($, element, dictionary, shouldBold = true) {
   $(element).contents().each(function () {
     if (this.type === 'text') {
       // Replace &nbsp; with a regular space
@@ -15,20 +88,7 @@ function processTextNodes($, element, dictionary) {
         return;
       }
 
-      const processedText = text.replace(/\b([a-zA-Z'-]+)/g, function (word) {
-        const prefixLength = findLongestValidPrefix(word, dictionary);
-        var midpoint = Math.floor(word.length / 2);
-
-        if (midpoint < 1) {
-          midpoint = 1;
-        }
-
-        if (prefixLength > 0 && prefixLength >= midpoint && word.length > 1) {
-          return `<b>${word.slice(0, prefixLength)}</b>${word.slice(prefixLength)}`;
-        } else {
-          return `<b>${word.slice(0, midpoint)}</b>${word.slice(midpoint)}`;
-        }
-      });
+      const processedText = buildProcessedText(text, dictionary, shouldBold);
 
       // Load the processed text into a new cheerio instance to ensure tags are correctly formed
       const wrappedText = cheerio.load(`<root>${processedText}</root>`, {
@@ -36,8 +96,8 @@ function processTextNodes($, element, dictionary) {
         decodeEntities: false
       });
       $(this).replaceWith(wrappedText('root').html() || '');
-    } else if (this.type === 'tag' && !SKIPPED_TAGS.has((this.tagName || '').toLowerCase())) {
-      processTextNodes($, this, dictionary); // Recursively process child nodes, skip images
+    } else if (this.type === 'tag') {
+      processTextNodes($, this, dictionary, shouldBold && !SKIPPED_TAGS.has((this.tagName || '').toLowerCase()));
     }
   });
 }

@@ -5,16 +5,14 @@ services:
     image: wilburforce83/dyslibria:${IMAGE_TAG:-latest}
     container_name: dyslibria
     pull_policy: always
-    env_file:
-      - .env
     ports:
-      - "${MAIN_PORT:-3000}:${MAIN_PORT:-3000}"
-      - "${WEBDAV_PORT:-1900}:${WEBDAV_PORT:-1900}"
+      - "3000:3000"
+      - "1900:1900"
     volumes:
-      - ./uploads:/usr/src/app/uploads
-      - ./processed:/usr/src/app/processed
-      - ./db:/usr/src/app/db
-      - ./failed:/usr/src/app/failed
+      - dyslibria_uploads:/usr/src/app/uploads
+      - dyslibria_processed:/usr/src/app/processed
+      - dyslibria_db:/usr/src/app/db
+      - dyslibria_failed:/usr/src/app/failed
     healthcheck:
       test:
         - CMD
@@ -26,3 +24,9 @@ services:
       start_period: 20s
       retries: 3
     restart: unless-stopped
+
+volumes:
+  dyslibria_uploads:
+  dyslibria_processed:
+  dyslibria_db:
+  dyslibria_failed:

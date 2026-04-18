@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Dyslibria Settings</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#93381f">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Dyslibria">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
+  <link rel="stylesheet" type="text/css" href="semantic.min.css">
+  <link rel="stylesheet" type="text/css" href="library.css">
+  <link rel="stylesheet" type="text/css" href="settings.css">
+  <script defer src="jquery.js"></script>
+  <script defer src="semantic.min.js"></script>
+  <script defer src="/app-theme.js"></script>
+  <script defer src="pwa.js"></script>
+  <script defer src="settings.js"></script>
+</head>
+
+<body class="theme-dark">
+  <div class="settings-app theme-dark" id="settingsApp">
+    <header class="settings-header">
+      <div class="brand-block">
+        <p class="eyebrow">Accessible self-hosted library</p>
+        <a class="brand-mark" href="/authenticated/index.html" aria-label="Dyslibria home">
+          <span class="brand-wordmark"><span class="brand-kicker">Dys</span>libria</span>
+        </a>
+      </div>
+
+      <div class="settings-header-utility">
+        <button class="ui button app-button ghost settings-menu-button" id="settingsMenuToggle" type="button"
+          aria-expanded="false" aria-controls="settingsHeaderActions">
+          <i class="bars icon" aria-hidden="true"></i>
+          <span>Menu</span>
+        </button>
+      </div>
+
+      <div class="settings-header-actions" id="settingsHeaderActions">
+        <a class="ui button app-button ghost" href="/authenticated/index.html" id="backToLibraryButton">
+          <i class="arrow left icon" aria-hidden="true"></i>
+          <span>Library</span>
+        </a>
+        <form method="post" action="/logout">
+          <button class="ui button app-button ghost" type="submit">
+            <i class="sign out alternate icon" aria-hidden="true"></i>
+            <span>Sign out</span>
+          </button>
+        </form>
+      </div>
+    </header>
+
+    <main class="settings-main">
+      <section class="settings-intro">
+        <div>
+          <p class="eyebrow">Control centre</p>
+          <h1 id="settingsHeading">Settings</h1>
+          <p class="settings-copy" id="settingsIntroCopy">
+            Manage system defaults, account access, and install behaviour from one place.
+          </p>
+        </div>
+        <div class="settings-badges">
+          <span class="meta-pill" id="currentUserBadge">Loading account…</span>
+          <span class="meta-pill" id="themeModeBadge">Dark theme</span>
+        </div>
+      </section>
+
+      <section class="settings-section setup-shell" id="setupShell" hidden>
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">First run</p>
+            <h2>Create your administrator account</h2>
+          </div>
+        </div>
+
+        <p class="settings-copy">
+          Dyslibria is running in first-run mode. Create the permanent administrator account now. After this step,
+          the bootstrap login stops working.
+        </p>
+
+        <form class="ui form stacked-grid" id="setupForm">
+          <div class="field">
+            <label>Administrator username</label>
+            <input type="text" name="username" autocomplete="username" placeholder="admin-account" required>
+          </div>
+          <div class="field">
+            <label>Administrator password</label>
+            <input type="password" name="password" autocomplete="new-password" placeholder="At least 8 characters" required>
+          </div>
+          <div class="field">
+            <label>Confirm password</label>
+            <input type="password" name="confirmPassword" autocomplete="new-password" placeholder="Repeat the password" required>
+          </div>
+          <div class="section-actions">
+            <button class="ui button app-button accent" type="submit" id="completeSetupButton">Complete setup</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="settings-grid" id="standardSettingsShell">
+        <section class="settings-section" id="profileSection">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Account</p>
+              <h2>Your profile</h2>
+            </div>
+          </div>
+
+          <div class="profile-summary">
+            <div>
+              <strong id="profileUsername">Loading…</strong>
+              <p id="profileRole">Checking account role</p>
+            </div>
+            <span class="meta-pill" id="profileStatus">Active</span>
+          </div>
+
+          <form class="ui form stacked-grid" id="passwordForm">
+            <div class="field">
+              <label>Current password</label>
+              <input type="password" name="currentPassword" autocomplete="current-password" required>
+            </div>
+            <div class="field">
+              <label>New password</label>
+              <input type="password" name="newPassword" autocomplete="new-password" required>
+            </div>
+            <div class="field">
+              <label>Confirm new password</label>
+              <input type="password" name="confirmNewPassword" autocomplete="new-password" required>
+            </div>
+            <div class="section-actions">
+              <button class="ui button app-button accent" type="submit" id="savePasswordButton">Update password</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="settings-section" id="installSection">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Install</p>
+              <h2>Install Dyslibria on this device</h2>
+            </div>
+          </div>
+
+          <p class="settings-copy">
+            Install Dyslibria as a PWA for a cleaner reading experience on phones, tablets, and desktops.
+          </p>
+
+          <div class="install-card">
+            <button class="ui button app-button accent hidden" id="settingsInstallButton" type="button" hidden>
+              Install app
+            </button>
+            <p class="install-help" id="installHelpText">
+              If your device does not show an install prompt, use the browser menu and choose Add to Home Screen.
+            </p>
+          </div>
+        </section>
+
+        <section class="settings-section admin-section" id="generalSection" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">General</p>
+              <h2>System settings</h2>
+            </div>
+          </div>
+
+          <form class="ui form stacked-grid" id="generalSettingsForm">
+            <div class="fields">
+              <div class="field">
+                <label>WebDAV port</label>
+                <input type="text" name="webdavPort">
+              </div>
+              <div class="field">
+                <label>Web app and OPDS port</label>
+                <input type="text" name="opdsPort">
+              </div>
+            </div>
+            <div class="field">
+              <label>Upload path (absolute)</label>
+              <input type="text" name="uploadPath">
+            </div>
+            <div class="field">
+              <label>Library path (absolute)</label>
+              <input type="text" name="libraryPath">
+            </div>
+            <div class="field">
+              <label>External base URL</label>
+              <input type="text" name="baseUrl" placeholder="https://books.example.com">
+            </div>
+            <div class="field">
+              <label>Theme colour</label>
+              <select name="themeColor" id="themeColorSelect"></select>
+            </div>
+            <div class="section-actions">
+              <button class="ui button app-button accent" type="submit" id="saveGeneralSettingsButton">Save settings</button>
+              <button class="ui button app-button ghost" type="button" id="forceRefreshButton">Force library refresh</button>
+              <button class="ui button app-button ghost" type="button" id="restartServerButton">Restart server</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="settings-section admin-section" id="usersSection" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Users</p>
+              <h2>Account access</h2>
+            </div>
+          </div>
+
+          <form class="ui form user-create-form" id="createUserForm">
+            <div class="fields">
+              <div class="field">
+                <label>Username</label>
+                <input type="text" name="username" placeholder="reader-one" required>
+              </div>
+              <div class="field">
+                <label>Password</label>
+                <input type="password" name="password" placeholder="Temporary password" required>
+              </div>
+              <div class="field">
+                <label>Role</label>
+                <select name="role">
+                  <option value="reader">Reader</option>
+                  <option value="admin">Administrator</option>
+                </select>
+              </div>
+            </div>
+            <div class="section-actions">
+              <button class="ui button app-button accent" type="submit" id="createUserButton">Add user</button>
+            </div>
+          </form>
+
+          <div class="user-list" id="userList" aria-live="polite"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+</body>
+
+</html>

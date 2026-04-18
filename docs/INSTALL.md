@@ -36,68 +36,74 @@ The included `docker-compose.yml` pulls the published image:
 
 - `wilburforce83/dyslibria:latest`
 
-### 2. Create your environment file
+### 2. Start Dyslibria
 
-Copy the example file:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and set at least:
-
-```env
-MAIN_PORT=3000
-WEBDAV_PORT=1900
-WEBDAV_USERNAME=change-this
-WEBDAV_PASSWORD=change-this-too
-SESSION_SECRET=replace-with-a-long-random-secret
-BASE_URL=http://localhost:3000
-```
-
-Notes:
-
-- `WEBDAV_USERNAME` and `WEBDAV_PASSWORD` are also used for normal web login.
-- `SESSION_SECRET` should be long and random.
-- `BASE_URL` should be the external URL that readers and OPDS clients should use.
-- If you publish Dyslibria behind a reverse proxy or public domain, set `BASE_URL` to that full external URL.
-- To pin a specific Docker image release, set `IMAGE_TAG` in `.env`, for example `IMAGE_TAG=v1.0.0`.
-
-### 3. Create persistent folders
-
-```bash
-mkdir -p uploads processed db failed
-```
-
-### 4. Start Dyslibria
-
-```bash
 docker compose pull
 docker compose up -d
 ```
 
-### 5. Open the app
+### 3. Open the app
 
 - Web app: `http://localhost:3000`
 - WebDAV: `http://localhost:1900`
 - OPDS: `http://localhost:3000/opds`
 
+### 4. Complete first-run setup
+
+On a brand-new install:
+
+- sign in with `admin`
+- use password `dyslibria`
+- create the permanent administrator account in the setup page
+
+After that:
+
+- the bootstrap login stops working
+- normal user accounts are managed from the in-app settings page
+
 ### Docker volumes used by default
 
 The included `docker-compose.yml` persists these paths:
 
-- `./uploads:/usr/src/app/uploads`
-- `./processed:/usr/src/app/processed`
-- `./db:/usr/src/app/db`
-- `./failed:/usr/src/app/failed`
+- `dyslibria_uploads:/usr/src/app/uploads`
+- `dyslibria_processed:/usr/src/app/processed`
+- `dyslibria_db:/usr/src/app/db`
+- `dyslibria_failed:/usr/src/app/failed`
 
-These are the folders you should back up.
+These are Docker named volumes, so you do not need to create host folders just to get started.
 
-The Compose file also supports:
+To inspect them:
 
-- `IMAGE_TAG=latest` by default
+```bash
+docker volume ls | grep dyslibria
+```
 
-That lets you track `latest` or pin a specific release such as `v1.0.0`.
+### Optional: override defaults with `.env`
+
+An `.env` file is optional now.
+
+You only need one if you want to override defaults such as:
+
+- custom ports
+- a public `BASE_URL`
+- a fixed `SESSION_SECRET`
+- a pinned Docker image tag
+
+Example:
+
+```bash
+cp .env.example .env
+```
+
+Useful optional values:
+
+```env
+MAIN_PORT=3000
+WEBDAV_PORT=1900
+BASE_URL=https://books.example.com
+IMAGE_TAG=v1.0.0
+SESSION_SECRET=replace-with-a-long-random-string
+```
 
 ### Updating a Docker install
 
@@ -126,11 +132,23 @@ docker run -d \
   --name dyslibria \
   -p 3000:3000 \
   -p 1900:1900 \
-  --env-file .env \
-  -v "$(pwd)/uploads:/usr/src/app/uploads" \
-  -v "$(pwd)/processed:/usr/src/app/processed" \
-  -v "$(pwd)/db:/usr/src/app/db" \
-  -v "$(pwd)/failed:/usr/src/app/failed" \
+  --restart unless-stopped \
+  wilburforce83/dyslibria:latest
+```
+
+That works with Dyslibria's defaults and an ephemeral container filesystem.
+
+If you want persistent Docker volumes with `docker run`, add:
+
+```bash
+docker run -d \
+  --name dyslibria \
+  -p 3000:3000 \
+  -p 1900:1900 \
+  -v dyslibria_uploads:/usr/src/app/uploads \
+  -v dyslibria_processed:/usr/src/app/processed \
+  -v dyslibria_db:/usr/src/app/db \
+  -v dyslibria_failed:/usr/src/app/failed \
   --restart unless-stopped \
   wilburforce83/dyslibria:latest
 ```
@@ -173,15 +191,13 @@ npm install
 cp .env.example .env
 ```
 
-Then edit `.env` with your real values:
+Then edit `.env` with the values you want to override:
 
 ```env
 MAIN_PORT=3000
 WEBDAV_PORT=1900
-WEBDAV_USERNAME=change-this
-WEBDAV_PASSWORD=change-this-too
-SESSION_SECRET=replace-with-a-long-random-secret
 BASE_URL=http://localhost:3000
+SESSION_SECRET=replace-with-a-long-random-string
 ```
 
 ### 4. Create working folders
@@ -201,6 +217,15 @@ npm start
 ```bash
 npm test
 ```
+
+### 7. Complete first-run setup
+
+On a fresh source install, sign in with:
+
+- username `admin`
+- password `dyslibria`
+
+Then create the permanent administrator account in the setup page.
 
 ## Persistent Folder Reference
 
@@ -225,6 +250,8 @@ This contains Dyslibria state, including:
 - app settings
 - metadata cache
 - reading progress
+- user accounts
+- generated runtime secret data
 
 ### `failed/`
 
@@ -263,10 +290,10 @@ For full Android PWA installation from another device, you generally need HTTPS 
 
 Check these first:
 
-- `.env` exists
-- `WEBDAV_USERNAME` is set
-- `WEBDAV_PASSWORD` is set
-- `SESSION_SECRET` is set
+- the container can bind to ports `3000` and `1900`
+- the `db/` path or Docker volume is writable
+- the Docker image pulled correctly
+- for source installs, Node.js 20 or newer is available
 
 ### Login works but assets look stale
 
@@ -282,3 +309,12 @@ Check:
 ### OPDS links point at the wrong address
 
 Your `BASE_URL` is wrong or missing.
+
+### I do not want to use the bootstrap login
+
+That is only used for the first run.
+
+After you create the permanent administrator account:
+
+- `admin` / `dyslibria` stops working
+- real access is controlled entirely from Dyslibria's user management page

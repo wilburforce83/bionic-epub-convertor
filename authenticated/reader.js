@@ -59,6 +59,9 @@
     app: document.getElementById('readerApp'),
     loadingTitle: document.getElementById('loadingTitle'),
     loadingMeta: document.getElementById('loadingMeta'),
+    loadingProgressLabel: document.getElementById('loadingProgressLabel'),
+    loadingProgressDetail: document.getElementById('loadingProgressDetail'),
+    loadingProgressFill: document.getElementById('loadingProgressFill'),
     progressActions: document.getElementById('progressActions'),
     progressPanel: document.getElementById('progressPanel'),
     progressTitle: document.getElementById('progressTitle'),
@@ -327,6 +330,15 @@
   function setLoadingState(title, subtitle) {
     elements.loadingTitle.textContent = title;
     elements.loadingMeta.textContent = subtitle;
+  }
+
+  function setLoadingProgress(percent, detail) {
+    const safePercent = Math.max(0, Math.min(100, Number(percent) || 0));
+    const safeDetail = detail || 'Preparing reader shell';
+
+    elements.loadingProgressLabel.textContent = `${safePercent}%`;
+    elements.loadingProgressDetail.textContent = safeDetail;
+    elements.loadingProgressFill.style.width = `${safePercent}%`;
   }
 
   function markLoaded() {
@@ -860,6 +872,7 @@
     if (!fileName) {
       updateMetadata('No EPUB selected', 'Open a book from the dashboard first.');
       setLoadingState('No EPUB selected', 'Open a book from the dashboard first.');
+      setLoadingProgress(0, 'Open a book from the library first.');
       elements.chapterLabel.textContent = 'No file parameter was provided.';
       elements.progressDetail.textContent = 'Open a book from the library first.';
       openOverlay('settings', { pushHistory: false });
@@ -872,8 +885,11 @@
     attachEventListeners();
 
     try {
+      setLoadingProgress(8, 'Checking saved position');
       const savedProgressPromise = fetchSavedProgress(fileName);
+      setLoadingProgress(18, 'Loading EPUB package');
       const epubBuffer = await fetchEpubBuffer(fileName);
+      setLoadingProgress(34, 'Preparing browser reader');
       book = ePub(epubBuffer);
       rendition = book.renderTo('viewer', {
         width: '100%',
@@ -890,12 +906,14 @@
       rendition.on('click', handleSurfaceInteraction);
       rendition.on('touchend', handleSurfaceInteraction);
 
+      setLoadingProgress(48, 'Reading package metadata');
       await book.ready;
       readingDirection = (book.package && book.package.metadata && book.package.metadata.direction) || 'ltr';
 
       const metadata = (book.package && book.package.metadata) || {};
       updateMetadata(metadata.title, metadata.creator);
 
+      setLoadingProgress(62, 'Loading table of contents');
       const navigation = await book.loaded.navigation;
       const tocEntries = Array.isArray(navigation) ? navigation : (navigation.toc || []);
       flatTocEntries = [];
@@ -903,24 +921,29 @@
       renderTocList(tocEntries);
 
       try {
+        setLoadingProgress(76, 'Building page map');
         await book.locations.generate(1600);
       } catch (error) {
         console.warn('Unable to generate reading locations before first render:', error);
       }
 
+      setLoadingProgress(88, 'Restoring reading position');
       const savedProgress = await savedProgressPromise;
       applySavedProgress(savedProgress);
 
       const startingLocation = requestedLocation || (savedProgress && savedProgress.location) || getSavedLocalLocation();
+      setLoadingProgress(96, 'Opening book');
       await rendition.display(startingLocation || undefined);
       applyReaderSettings();
       resizeRendition();
+      setLoadingProgress(100, 'Ready to read');
       markLoaded();
       updateProgress(rendition.currentLocation());
     } catch (error) {
       console.error('Reader failed to load:', error);
       updateMetadata('Unable to open book', error.message);
       setLoadingState('Unable to open book', 'This EPUB could not be rendered in the browser.');
+      setLoadingProgress(100, 'Rendering failed');
       elements.chapterLabel.textContent = 'This EPUB could not be rendered in the browser.';
       elements.progressDetail.textContent = 'This file could not be rendered in the browser reader.';
       openOverlay('settings', { pushHistory: false });

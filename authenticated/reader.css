@@ -139,6 +139,27 @@ input {
   font-weight: 400;
 }
 
+.loading-progress-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  margin-top: 0.85rem;
+}
+
+.loading-progress-row strong {
+  font-family: var(--heading-font);
+  font-size: 1.35rem;
+  font-weight: 400;
+}
+
+.loading-progress-row span {
+  color: var(--reader-muted);
+}
+
+.loading-progress-track {
+  margin-top: 0.65rem;
+}
+
 .progress-panel,
 .settings-panel {
   position: fixed;

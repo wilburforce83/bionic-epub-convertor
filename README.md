@@ -17,8 +17,6 @@ The recommended path is Docker.
 ```bash
 git clone https://github.com/wilburforce83/bionic-epub-convertor.git
 cd bionic-epub-convertor
-cp .env.example .env
-mkdir -p uploads processed db failed
 docker compose up -d
 ```
 
@@ -26,13 +24,19 @@ The included Compose file pulls the published image:
 
 - `wilburforce83/dyslibria:latest`
 
-If you want to pin a specific release instead of tracking `latest`, set `IMAGE_TAG` in `.env`.
-
 Then open:
 
 - Web app: `http://localhost:3000`
 - WebDAV: `http://localhost:1900`
 - OPDS: `http://localhost:3000/opds`
+
+On the first launch:
+
+- sign in with `admin` / `dyslibria`
+- create the permanent administrator account in the setup screen
+- after setup, the bootstrap login stops working
+
+An `.env` file is optional now. Dyslibria can run with its built-in defaults, and Docker Compose uses named volumes automatically.
 
 ## Documentation
 

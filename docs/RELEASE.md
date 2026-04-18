@@ -71,7 +71,7 @@ If you have Docker available locally, it is also worth doing a final image smoke
 
 ```bash
 docker build -t dyslibria-release-test .
-docker run --rm -p 3000:3000 --env-file .env dyslibria-release-test
+docker run --rm -p 3000:3000 -p 1900:1900 dyslibria-release-test
 ```
 
 ### 2. Commit and push your final changes
@@ -125,16 +125,14 @@ End users should not need to build the image themselves.
 They can:
 
 1. clone the repo for the compose file and docs
-2. create `.env`
-3. create `uploads`, `processed`, `db`, and `failed`
-4. run:
+2. run:
 
 ```bash
 docker compose pull
 docker compose up -d
 ```
 
-If they want to stay on a specific release, they can set:
+If they want to stay on a specific release, they can export or define:
 
 ```env
 IMAGE_TAG=v1.0.0

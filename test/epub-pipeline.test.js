@@ -52,6 +52,33 @@ test('processHtmlFiles converts readable text but leaves preformatted blocks alo
   assert.doesNotMatch(content, /<pre><b>/);
 });
 
+test('processHtmlFiles escapes stray ampersands without double-escaping valid entities', async () => {
+  const tempDir = await makeTempDir('dyslibria-entities-');
+  const filePath = path.join(tempDir, 'entities.xhtml');
+
+  await fs.writeFile(
+    filePath,
+    `<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <body>
+    <p>AT&T and Tom &amp; Jerry & Blues</p>
+    <pre>R&D && Co.</pre>
+  </body>
+</html>`
+  );
+
+  const result = await processHtmlFiles(tempDir, new Set());
+  const content = await fs.readFile(filePath, 'utf-8');
+
+  assert.equal(result.processedFiles, 1);
+  assert.deepEqual(result.errors, []);
+  assert.match(content, /<b>A<\/b>T&amp;<b>T<\/b>/);
+  assert.match(content, /<b>T<\/b>om &amp; <b>Je<\/b>rry &amp; <b>Bl<\/b>ues/);
+  assert.match(content, /<pre>R&amp;D &amp;&amp; Co\.<\/pre>/);
+  assert.doesNotMatch(content, /&amp;amp;/);
+  assert.doesNotMatch(content, /&amp;<b>a<\/b>mp;/);
+});
+
 test('processHtmlFiles can handle XHTML fragments without a body wrapper', async () => {
   const tempDir = await makeTempDir('dyslibria-fragment-');
   const filePath = path.join(tempDir, 'fragment.xhtml');

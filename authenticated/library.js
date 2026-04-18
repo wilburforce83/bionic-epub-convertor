@@ -28,6 +28,7 @@ $(document).ready(function () {
     books: [],
     query: '',
     latestProgress: null,
+    session: null,
     theme: localStorage.getItem(THEME_STORAGE_KEY) || 'dark',
     themeColorKey: (window.DyslibriaTheme && window.DyslibriaTheme.DEFAULT_COLOR_KEY) || 'ember',
     themeColorOptions: (window.DyslibriaTheme && window.DyslibriaTheme.COLOR_OPTIONS.slice()) || [],
@@ -37,7 +38,9 @@ $(document).ready(function () {
     tipTimer: null,
     status: null,
     logs: [],
-    mobileMenuOpen: false
+    mobileMenuOpen: false,
+    pendingPostConversionRefresh: false,
+    autoRefreshInFlight: false
   };
 
   const $app = $('#libraryApp');
@@ -52,14 +55,10 @@ $(document).ready(function () {
   const $searchBar = $('#searchBar');
   const $dropZone = $('#dropZone');
   const $fileInput = $('#epubFiles');
+  const $adminTools = $('.admin-tool');
   const $themeToggle = $('#themeToggle');
   const $themeToggleIcon = $('#themeToggleIcon');
   const $themeToggleText = $('#themeToggleText');
-  const $themeColorSelect = $('#themeColorSelect');
-  const $openInstallHelpButton = $('#openInstallHelpButton');
-  const $closeInstallHelpButton = $('#closeInstallHelpButton');
-  const $installPopover = $('#installPopover');
-  const $settingsInstallButton = $('#settingsInstallButton');
   const $conversionStatus = $('#conversionStatus');
   const $conversionStatusText = $('#conversionStatusText');
   const $heroStatusText = $('#heroStatusText');
@@ -80,10 +79,6 @@ $(document).ready(function () {
   const $logsOutput = $('#logsOutput');
   const $menuToggle = $('#menuToggle');
   const $toolbarActions = $('#toolbarActions');
-
-  if (window.DyslibriaPwa) {
-    window.DyslibriaPwa.bindInstallButton($settingsInstallButton.get(0));
-  }
 
   function randomTipDelay() {
     return 10000 + Math.floor(Math.random() * 5000);
@@ -131,23 +126,9 @@ $(document).ready(function () {
   }
 
   function populateThemeColorOptions() {
-    const options = state.themeColorOptions.length
+    return state.themeColorOptions.length
       ? state.themeColorOptions
       : ((window.DyslibriaTheme && window.DyslibriaTheme.COLOR_OPTIONS) || []);
-
-    $themeColorSelect.empty();
-
-    options.forEach(function (option) {
-      const $option = $('<option>')
-        .attr('value', option.key)
-        .text(option.label);
-
-      if (option.key === state.themeColorKey) {
-        $option.prop('selected', true);
-      }
-
-      $themeColorSelect.append($option);
-    });
   }
 
   function applyAccentPalette() {
@@ -172,6 +153,11 @@ $(document).ready(function () {
     $themeToggleText.text(isDark ? 'Light theme' : 'Dark theme');
     applyAccentPalette();
     localStorage.setItem(THEME_STORAGE_KEY, state.theme);
+  }
+
+  function applySessionCapabilities() {
+    const isAdmin = Boolean(state.session && state.session.canManageSystem);
+    $adminTools.prop('hidden', !isAdmin);
   }
 
   function applyBannerState() {
@@ -296,9 +282,29 @@ $(document).ready(function () {
   }
 
   function applySystemStatus(status) {
+    const previousStatus = state.status;
+    const wasBusy = Boolean(previousStatus && (previousStatus.processing || previousStatus.queueLength > 0));
+    const isBusy = Boolean(status && (status.processing || status.queueLength > 0));
+
     state.status = status;
 
     $conversionStatus.removeClass('is-processing is-idle is-attention');
+
+    if (isBusy) {
+      state.pendingPostConversionRefresh = true;
+    } else if (wasBusy && state.pendingPostConversionRefresh && !state.autoRefreshInFlight) {
+      state.pendingPostConversionRefresh = false;
+      triggerAutomaticLibraryRefresh();
+    }
+
+    if (state.autoRefreshInFlight) {
+      $conversionStatus.addClass('is-processing');
+      $conversionStatusText.text('Refreshing library');
+      $heroStatusText.text('Refreshing library');
+      $heroStatusMeta.text('Refreshing the dashboard now that conversion work has finished.');
+      $viewLogsLabel.text(status.logCount > 0 ? `Logs (${status.logCount})` : 'Logs');
+      return;
+    }
 
     if (status.processing) {
       $conversionStatus.addClass('is-processing');
@@ -322,6 +328,29 @@ $(document).ready(function () {
     }
 
     $viewLogsLabel.text(status.logCount > 0 ? `Logs (${status.logCount})` : 'Logs');
+  }
+
+  function triggerAutomaticLibraryRefresh() {
+    if (state.autoRefreshInFlight) {
+      return;
+    }
+
+    state.autoRefreshInFlight = true;
+    applySystemStatus(state.status || {
+      processing: false,
+      queueLength: 0,
+      logCount: 0,
+      latestLog: null
+    });
+
+    const logRefresh = state.session && state.session.canManageSystem
+      ? loadLogs()
+      : $.Deferred().resolve().promise();
+
+    $.when(loadBooks(), loadReadingProgress(), logRefresh).always(function () {
+      state.autoRefreshInFlight = false;
+      loadSystemStatus();
+    });
   }
 
   function renderLogs() {
@@ -371,6 +400,16 @@ $(document).ready(function () {
     });
   }
 
+  function loadSession() {
+    return $.get('/api/session').then(function (payload) {
+      state.session = payload || null;
+      applySessionCapabilities();
+    }).catch(function () {
+      state.session = null;
+      applySessionCapabilities();
+    });
+  }
+
   function loadSystemStatus() {
     return $.get('/api/system-status').then(function (payload) {
       applySystemStatus(payload || {});
@@ -405,10 +444,8 @@ $(document).ready(function () {
         ? themeColors
         : state.themeColorOptions;
       state.themeColorKey = (payload && payload.themeColor) || state.themeColorKey;
-      populateThemeColorOptions();
       applyTheme();
     }).catch(function () {
-      populateThemeColorOptions();
       applyTheme();
     });
   }
@@ -419,20 +456,6 @@ $(document).ready(function () {
   }
 
   function bindEvents() {
-    $('#updateDatabaseButton').on('click', function () {
-      const $button = $(this);
-      closeMobileMenu();
-      setButtonBusy($button, true);
-
-      $.post('/update-database', function () {
-        refreshDashboard();
-      }).fail(function () {
-        alert('Error refreshing library');
-      }).always(function () {
-        setButtonBusy($button, false);
-      });
-    });
-
     $('#uploadButton').on('click', function () {
       closeMobileMenu();
       $('#uploadModal').modal('show');
@@ -440,56 +463,7 @@ $(document).ready(function () {
 
     $('#settingsButton').on('click', function () {
       closeMobileMenu();
-      $.get('/settings', function (data) {
-        $installPopover.prop('hidden', true);
-        if (Array.isArray(data.themeColors) && data.themeColors.length) {
-          state.themeColorOptions = data.themeColors;
-        }
-
-        state.themeColorKey = data.themeColor || state.themeColorKey;
-        populateThemeColorOptions();
-        $('#settingsForm').find('input[name="webdavPort"]').val(data.webdavPort);
-        $('#settingsForm').find('input[name="opdsPort"]').val(data.opdsPort);
-        $('#settingsForm').find('input[name="uploadPath"]').val(data.uploadPath);
-        $('#settingsForm').find('input[name="libraryPath"]').val(data.libraryPath);
-        $('#settingsForm').find('input[name="baseUrl"]').val(data.baseUrl);
-        $themeColorSelect.val(state.themeColorKey);
-        $('#settingsModal').modal('show');
-      }).fail(function () {
-        alert('Error loading settings');
-      });
-    });
-
-    $('#cancelSettingsButton').on('click', function () {
-      $installPopover.prop('hidden', true);
-      $('#settingsModal').modal('hide');
-    });
-
-    $('#saveSettingsButton').on('click', function () {
-      const settingsData = $('#settingsForm').serialize();
-
-      $.post('/settings', settingsData, function (response) {
-        state.themeColorKey = $themeColorSelect.val() || state.themeColorKey;
-        applyTheme();
-        $installPopover.prop('hidden', true);
-        $('#settingsModal').modal('hide');
-        alert(
-          response && response.requiresRestart
-            ? 'Settings saved. Restart the server for path, port, or base URL changes to take effect.'
-            : 'Settings saved.'
-        );
-      }).fail(function (xhr) {
-        const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Error saving settings';
-        alert(message);
-      });
-    });
-
-    $('#restartServerButton').on('click', function () {
-      $.post('/restart-server', function () {
-        alert('Server is restarting...');
-      }).fail(function () {
-        alert('Server restart is disabled or failed. Restart the process manually.');
-      });
+      window.location.href = 'settings.html';
     });
 
     $('#uploadForm').on('submit', function (event) {
@@ -613,18 +587,6 @@ $(document).ready(function () {
       $(this).attr('aria-expanded', String(state.mobileMenuOpen));
     });
 
-    $openInstallHelpButton.on('click', function () {
-      $installPopover.prop('hidden', false);
-
-      if (window.DyslibriaPwa && typeof window.DyslibriaPwa.refreshButtons === 'function') {
-        window.DyslibriaPwa.refreshButtons();
-      }
-    });
-
-    $closeInstallHelpButton.on('click', function () {
-      $installPopover.prop('hidden', true);
-    });
-
     $(window).on('resize', function () {
       if (window.innerWidth > 1039) {
         closeMobileMenu();
@@ -639,15 +601,15 @@ $(document).ready(function () {
   }
 
   function initialise() {
-    populateThemeColorOptions();
     applyTheme();
+    applySessionCapabilities();
     applyBannerState();
     renderTip();
     scheduleNextTip();
     renderContinueCard();
     bindEvents();
 
-    $.when(loadAppConfig(), refreshDashboard()).fail(function () {
+    $.when(loadAppConfig(), loadSession(), refreshDashboard()).fail(function () {
       alert('Error loading library');
     });
 

@@ -95,6 +95,20 @@
       line-height: 1.6;
     }
 
+    .setup-note {
+      margin: 0 0 1.25rem;
+      padding: 0.9rem 1rem;
+      border-radius: 0.5rem;
+      border: 1px solid rgba(var(--login-accent-rgb), 0.24);
+      background: rgba(var(--login-accent-rgb), 0.1);
+      color: var(--login-text);
+      line-height: 1.55;
+    }
+
+    .setup-note strong {
+      color: var(--login-accent-soft);
+    }
+
     .ui.form .field > label {
       color: var(--login-muted);
       font-weight: 600;
@@ -131,6 +145,7 @@
       <p class="eyebrow">Accessible self-hosted library</p>
       <h1 class="brand"><span class="brand-kicker">Dys</span>libria</h1>
       <p class="login-copy">Sign in to manage your library, resume your place, and keep EPUB conversion running in one place.</p>
+      <div class="setup-note" id="setupNote" hidden></div>
 
       <form class="ui form" method="post" action="/login">
         <div class="field">
@@ -164,6 +179,15 @@
       const palette = window.DyslibriaTheme.applyPalette(payload.themeColor || window.DyslibriaTheme.DEFAULT_COLOR_KEY);
       document.querySelector('meta[name="theme-color"]')
         .setAttribute('content', window.DyslibriaTheme.getMetaThemeColor('dark', palette));
+
+      if (payload.setupRequired) {
+        const setupNote = document.getElementById('setupNote');
+        setupNote.hidden = false;
+        setupNote.innerHTML =
+          'First launch detected. Sign in with <strong>' +
+          (payload.bootstrapUsername || 'admin') +
+          '</strong> / <strong>dyslibria</strong>, then create your real administrator account.';
+      }
     }
 
     fetch('/api/app-config')

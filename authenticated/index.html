@@ -57,15 +57,11 @@
             <i class="moon icon" id="themeToggleIcon" aria-hidden="true"></i>
             <span id="themeToggleText">Dark theme</span>
           </button>
-          <button class="ui button app-button ghost" id="viewLogsButton" type="button">
+          <button class="ui button app-button ghost admin-tool" id="viewLogsButton" type="button" hidden>
             <i class="file alternate outline icon" aria-hidden="true"></i>
             <span id="viewLogsLabel">Logs</span>
           </button>
-          <button class="ui button app-button ghost" id="updateDatabaseButton" type="button">
-            <i class="sync alternate icon" aria-hidden="true"></i>
-            <span>Refresh</span>
-          </button>
-          <button class="ui button app-button accent" id="uploadButton" type="button">
+          <button class="ui button app-button accent admin-tool" id="uploadButton" type="button" hidden>
             <i class="upload icon" aria-hidden="true"></i>
             <span>Upload</span>
           </button>
@@ -160,59 +156,6 @@
         <div class="drop-zone" id="dropZone">Drag EPUB files here or click to choose them</div>
         <button class="ui button app-button accent" type="submit">Convert and add to library</button>
       </form>
-    </div>
-  </div>
-
-  <div class="ui small modal" id="settingsModal">
-    <div class="header">Settings</div>
-    <div class="content">
-      <form class="ui form" id="settingsForm">
-        <div class="fields">
-          <div class="field">
-            <label>WebDAV port</label>
-            <input type="text" name="webdavPort">
-          </div>
-          <div class="field">
-            <label>OPDS and web app port</label>
-            <input type="text" name="opdsPort">
-          </div>
-        </div>
-        <div class="field">
-          <label>Upload path (absolute)</label>
-          <input type="text" name="uploadPath">
-        </div>
-        <div class="field">
-          <label>Library path (absolute)</label>
-          <input type="text" name="libraryPath">
-        </div>
-        <div class="field">
-          <label>External base URL</label>
-          <input type="text" name="baseUrl" placeholder="https://your-domain.example">
-        </div>
-        <div class="field">
-          <label>Theme colour</label>
-          <select name="themeColor" id="themeColorSelect"></select>
-        </div>
-      </form>
-      <div class="settings-install-link-row">
-        <button class="modal-text-link" id="openInstallHelpButton" type="button">Install Dyslibria on this device</button>
-      </div>
-      <section class="install-popover" id="installPopover" hidden>
-        <p class="eyebrow">Install</p>
-        <h3>Install Dyslibria</h3>
-        <p>Use this on phones, tablets, or desktops when you want Dyslibria to launch more like a dedicated app.</p>
-        <div class="install-popover-actions">
-          <button class="ui button app-button accent hidden" id="settingsInstallButton" type="button" hidden>
-            Install app
-          </button>
-          <button class="ui button" id="closeInstallHelpButton" type="button">Close</button>
-        </div>
-      </section>
-    </div>
-    <div class="actions">
-      <button class="ui button" id="cancelSettingsButton" type="button">Cancel</button>
-      <button class="ui button app-button accent" id="saveSettingsButton" type="button">Save</button>
-      <button class="ui basic button" id="restartServerButton" type="button">Restart server</button>
     </div>
   </div>
 

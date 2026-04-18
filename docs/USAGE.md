@@ -6,10 +6,18 @@ Open the main web app in your browser:
 
 - `http://localhost:3000` by default
 
-Log in with the username and password from your `.env` file:
+On a brand-new install:
 
-- `WEBDAV_USERNAME`
-- `WEBDAV_PASSWORD`
+- log in with username `admin`
+- use password `dyslibria`
+- Dyslibria will take you straight to the first-run setup page
+- create the permanent administrator account there
+
+After the setup flow:
+
+- the bootstrap login stops working
+- the new administrator account becomes the main web login
+- extra reader or administrator accounts can be managed from Settings
 
 ## Main Areas
 
@@ -26,9 +34,9 @@ The main screen shows:
 
 - a search bar
 - theme toggle
-- conversion logs button
-- refresh button
-- upload button
+- conversion logs button for administrators
+- refresh button for administrators
+- upload button for administrators
 - settings button
 - a collapsible dashboard banner
 - the library wall of processed books
@@ -56,6 +64,8 @@ Use the search bar to filter the library by:
 The top dashboard can be collapsed if you want more room for the library wall.
 
 ## Uploading Books
+
+Administrator accounts can upload books.
 
 Use the `Upload` button in the top bar.
 
@@ -94,11 +104,20 @@ Use `Logs` to view recent conversion activity, including:
 
 You can also clear the in-app log viewer from the UI.
 
+These controls are intended for administrator accounts.
+
 ## Settings
 
 Open `Settings` from the top bar.
 
-Current settings available in the UI:
+Settings is now a full page rather than a modal.
+
+What you see depends on your account role:
+
+- all users can view their own profile and change their password
+- administrator accounts can also change system settings and manage users
+
+Current settings and tools available in the UI:
 
 - WebDAV port
 - web app / OPDS port
@@ -106,6 +125,8 @@ Current settings available in the UI:
 - library path
 - external base URL
 - theme colour
+- user accounts and roles
+- password reset controls
 - install Dyslibria on this device
 
 ### What each setting does
@@ -140,10 +161,30 @@ Changes the main accent colour across:
 
 - login
 - library
-- settings modals
+- settings page
 - logs modal
 - reader chrome
 - PWA surfaces
+
+### User accounts and permissions
+
+Administrator accounts can:
+
+- add new users
+- create reader-only accounts
+- create additional administrator accounts
+- disable accounts
+- reset passwords
+- remove accounts
+
+Reader accounts can:
+
+- browse the library
+- open books in the web reader
+- use OPDS and WebDAV with their own credentials
+- save reading progress to the server
+
+They do not get administrator controls such as upload, refresh, log management, or system settings.
 
 ## Installing as a PWA
 
@@ -152,7 +193,7 @@ The app can be added to a device as a PWA.
 To do that:
 
 1. Open `Settings`
-2. Click `Install Dyslibria on this device`
+2. Use the install section
 3. Use the install prompt or follow the platform-specific instructions
 
 Notes:

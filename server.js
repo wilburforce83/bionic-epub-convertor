@@ -19,11 +19,16 @@ const { loadDictionary } = require('./utils/dictionaryUtils');
 const { extractResources, createEpub } = require('./utils/fileUtils');
 const { processHtmlFiles } = require('./utils/htmlProcessor');
 const { extractEpubData, getEpubs } = require('./utils/epubDataUtils');
+const { createUserStore, DEFAULT_BOOTSTRAP_USERNAME, DEFAULT_BOOTSTRAP_PASSWORD } = require('./utils/userStore');
 
 const app = express();
 const rootDir = __dirname;
-const db = new SimpleJsonDB(path.join(rootDir, 'db', 'db.json'));
-const readingProgressDb = new SimpleJsonDB(path.join(rootDir, 'db', 'reading-progress.json'));
+const dbDir = path.join(rootDir, 'db');
+fs.ensureDirSync(dbDir);
+const settingsDb = new SimpleJsonDB(path.join(dbDir, 'db.json'));
+const runtimeDb = new SimpleJsonDB(path.join(dbDir, 'runtime.json'));
+const readingProgressDb = new SimpleJsonDB(path.join(dbDir, 'reading-progress.json'));
+const userStore = createUserStore(path.join(dbDir, 'users.json'));
 
 const defaultUploadsDir = path.join(rootDir, 'uploads');
 const defaultProcessedDir = path.join(rootDir, 'processed');
@@ -81,7 +86,7 @@ function normalizeBaseUrl(value) {
 }
 
 function readConfigValue(envKey, dbKey) {
-  return process.env[envKey] || (dbKey && db.has(dbKey) ? db.get(dbKey) : '');
+  return process.env[envKey] || (dbKey && settingsDb.has(dbKey) ? settingsDb.get(dbKey) : '');
 }
 
 const THEME_COLOR_OPTIONS = [
@@ -108,7 +113,9 @@ function getPublicAppConfig() {
     success: true,
     defaultThemeMode: 'dark',
     themeColor: getThemeColorSetting(),
-    themeColors: THEME_COLOR_OPTIONS
+    themeColors: THEME_COLOR_OPTIONS,
+    setupRequired: isSetupRequired(),
+    bootstrapUsername: DEFAULT_BOOTSTRAP_USERNAME
   };
 }
 
@@ -124,19 +131,30 @@ const processedDir = resolveDirectorySetting(
 );
 const webdavPort = parsePort(readConfigValue('WEBDAV_PORT', 'webdavPort'), 1900, 'webdavPort');
 const PORT = parsePort(readConfigValue('MAIN_PORT', 'opdsPort'), 3000, 'opdsPort');
-const webdavUsername = String(readConfigValue('WEBDAV_USERNAME', 'webdavUsername') || '').trim();
-const webdavPassword = String(readConfigValue('WEBDAV_PASSWORD', 'webdavPassword') || '').trim();
-const sessionSecret = String(readConfigValue('SESSION_SECRET', 'sessionSecret') || '').trim();
 const configuredBaseUrl = normalizeBaseUrl(readConfigValue('BASE_URL', 'baseUrl'));
 const allowServerRestart = process.env.ALLOW_SERVER_RESTART === 'true';
+const legacyUsername = String(process.env.WEBDAV_USERNAME || '').trim();
+const legacyPassword = String(process.env.WEBDAV_PASSWORD || '').trim();
 
-if (!webdavUsername || !webdavPassword) {
-  throw new Error('WEBDAV_USERNAME and WEBDAV_PASSWORD must be configured before starting Dyslibria.');
+function getOrCreateSessionSecret() {
+  const configuredSecret = String(process.env.SESSION_SECRET || (runtimeDb.has('sessionSecret') ? runtimeDb.get('sessionSecret') : '') || '').trim();
+  if (configuredSecret) {
+    if (!runtimeDb.has('sessionSecret')) {
+      runtimeDb.set('sessionSecret', configuredSecret);
+    }
+    return configuredSecret;
+  }
+
+  const generatedSecret = crypto.randomBytes(32).toString('hex');
+  runtimeDb.set('sessionSecret', generatedSecret);
+  return generatedSecret;
 }
 
-if (!sessionSecret) {
-  throw new Error('SESSION_SECRET must be configured before starting Dyslibria.');
-}
+const sessionSecret = getOrCreateSessionSecret();
+userStore.ensureLegacyAdmin({
+  username: legacyUsername,
+  password: legacyPassword
+});
 
 app.set('trust proxy', true);
 app.disable('x-powered-by');
@@ -173,19 +191,8 @@ app.use((req, res, next) => {
 
 app.use(express.static(path.join(rootDir, 'public')));
 
-function safeCompareStrings(left, right) {
-  const leftBuffer = Buffer.from(String(left));
-  const rightBuffer = Buffer.from(String(right));
-
-  if (leftBuffer.length !== rightBuffer.length) {
-    return false;
-  }
-
-  return crypto.timingSafeEqual(leftBuffer, rightBuffer);
-}
-
-function credentialsMatch(username, password) {
-  return safeCompareStrings(username, webdavUsername) && safeCompareStrings(password, webdavPassword);
+function isSetupRequired() {
+  return !userStore.hasUsers();
 }
 
 function parseBasicAuthHeader(req) {
@@ -212,6 +219,55 @@ function parseBasicAuthHeader(req) {
 
 function isSessionAuthenticated(req) {
   return req.session && req.session.authenticated === true;
+}
+
+function isBootstrapSession(req) {
+  return isSessionAuthenticated(req) && req.session.mustSetup === true;
+}
+
+function getCurrentUser(req) {
+  if (!isSessionAuthenticated(req)) {
+    return null;
+  }
+
+  if (isBootstrapSession(req)) {
+    return {
+      id: 'bootstrap-admin',
+      username: DEFAULT_BOOTSTRAP_USERNAME,
+      role: 'admin',
+      isActive: true,
+      mustSetup: true
+    };
+  }
+
+  const userId = String(req.session.userId || '').trim();
+  const user = userId ? userStore.getUserById(userId) : null;
+  if (!user || user.isActive === false) {
+    return null;
+  }
+
+  return {
+    ...user,
+    mustSetup: false
+  };
+}
+
+function requireSetupCompletion(req, res, next) {
+  if (!isBootstrapSession(req)) {
+    next();
+    return;
+  }
+
+  if (String(req.path || '').startsWith('/api/')) {
+    res.status(403).json({
+      success: false,
+      code: 'setup_required',
+      message: 'Initial setup must be completed before using Dyslibria.'
+    });
+    return;
+  }
+
+  res.redirect('/authenticated/settings.html?setup=1');
 }
 
 function shouldRedirectToLogin(req) {
@@ -247,8 +303,15 @@ function respondUnauthenticated(req, res) {
 }
 
 function isAuthenticated(req, res, next) {
-  if (isSessionAuthenticated(req)) {
+  if (getCurrentUser(req)) {
     next();
+    return;
+  }
+
+  if (req.session) {
+    req.session.destroy(() => {
+      respondUnauthenticated(req, res);
+    });
     return;
   }
 
@@ -256,13 +319,23 @@ function isAuthenticated(req, res, next) {
 }
 
 function requireCatalogAuth(req, res, next) {
-  if (isSessionAuthenticated(req)) {
+  const currentUser = getCurrentUser(req);
+  if (currentUser) {
+    if (currentUser.mustSetup) {
+      res.status(403).json({ success: false, message: 'Initial setup must be completed before accessing the catalog.' });
+      return;
+    }
+
     next();
     return;
   }
 
   const credentials = parseBasicAuthHeader(req);
-  if (credentials && credentialsMatch(credentials.username, credentials.password)) {
+  const authenticated = credentials
+    ? userStore.authenticate(credentials.username, credentials.password)
+    : null;
+
+  if (authenticated && authenticated.type === 'user') {
     next();
     return;
   }
@@ -296,6 +369,26 @@ const loginRateLimiter = createRateLimiter({
   keyFn: (req) => req.ip
 });
 
+function requireAdmin(req, res, next) {
+  const user = getCurrentUser(req);
+  if (!user) {
+    respondUnauthenticated(req, res);
+    return;
+  }
+
+  if (user.role !== 'admin') {
+    res.status(403).json({ success: false, message: 'Administrator access required.' });
+    return;
+  }
+
+  if (user.mustSetup) {
+    res.status(403).json({ success: false, code: 'setup_required', message: 'Complete initial setup first.' });
+    return;
+  }
+
+  next();
+}
+
 function sanitizeFileStem(fileName) {
   const extension = path.extname(fileName);
   const baseName = path.basename(fileName, extension);
@@ -320,24 +413,34 @@ function sanitizeEpubFilename(requestedFilename) {
 }
 
 function getReadingProgressUser(req) {
-  if (req.session && typeof req.session.username === 'string' && req.session.username.trim()) {
-    return req.session.username.trim();
+  const currentUser = getCurrentUser(req);
+  if (currentUser) {
+    return currentUser;
   }
 
-  return webdavUsername;
+  return null;
 }
 
-function getReadingProgressKey(userId, filename) {
-  return `${userId}::${filename}`;
+function getReadingProgressKey(user, filename) {
+  return `${user.id}::${filename}`;
 }
 
-function readStoredProgress(userId, filename) {
-  const storedValue = readingProgressDb.get(getReadingProgressKey(userId, filename));
-  if (!storedValue || typeof storedValue !== 'object') {
+function readStoredProgress(user, filename) {
+  if (!user) {
     return null;
   }
 
-  return storedValue;
+  const directMatch = readingProgressDb.get(getReadingProgressKey(user, filename));
+  if (directMatch && typeof directMatch === 'object') {
+    return directMatch;
+  }
+
+  const legacyMatch = readingProgressDb.get(`${user.username}::${filename}`);
+  if (legacyMatch && typeof legacyMatch === 'object') {
+    return legacyMatch;
+  }
+
+  return null;
 }
 
 function sanitizeProgressPayload(payload) {
@@ -365,6 +468,25 @@ function sanitizeProgressPayload(payload) {
     title: String(payload.title || '').trim().slice(0, 300),
     author: String(payload.author || '').trim().slice(0, 300)
   };
+}
+
+function normalizeBoolean(value, fallback = false) {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['true', '1', 'yes', 'on'].includes(normalized)) {
+      return true;
+    }
+
+    if (['false', '0', 'no', 'off'].includes(normalized)) {
+      return false;
+    }
+  }
+
+  return fallback;
 }
 
 const queuedUploadPaths = new Set();
@@ -714,6 +836,22 @@ app.get('/api/app-config', (req, res) => {
   res.json(getPublicAppConfig());
 });
 
+app.get('/api/session', isAuthenticated, (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) {
+    res.status(401).json({ success: false, message: 'Authentication required.' });
+    return;
+  }
+
+  res.json({
+    success: true,
+    user,
+    setupRequired: isSetupRequired(),
+    canManageUsers: user.role === 'admin',
+    canManageSystem: user.role === 'admin' && !user.mustSetup
+  });
+});
+
 app.get('/api/system-status', isAuthenticated, async (req, res) => {
   const metadataReady = await getMetadataReady();
   const runtimeStatus = getRuntimeStatus();
@@ -727,20 +865,31 @@ app.get('/api/system-status', isAuthenticated, async (req, res) => {
   });
 });
 
-app.get('/api/conversion-logs', isAuthenticated, (req, res) => {
+app.get('/api/conversion-logs', requireAdmin, (req, res) => {
   res.json({
     success: true,
     logs: getRuntimeStatus().logs
   });
 });
 
-app.delete('/api/conversion-logs', isAuthenticated, (req, res) => {
+app.delete('/api/conversion-logs', requireAdmin, (req, res) => {
   conversionLogs.length = 0;
   res.json({ success: true });
 });
 
 app.get('/login', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
+
+   if (isSessionAuthenticated(req)) {
+    if (isBootstrapSession(req)) {
+      res.redirect('/authenticated/settings.html?setup=1');
+      return;
+    }
+
+    res.redirect('/authenticated/index.html');
+    return;
+  }
+
   res.sendFile(path.join(rootDir, 'public', 'login.html'));
 });
 
@@ -748,7 +897,8 @@ app.get('/login', (req, res) => {
 app.post('/login', loginRateLimiter, async (req, res) => {
   const { username = '', password = '' } = req.body;
 
-  if (!credentialsMatch(username, password)) {
+  const authenticated = userStore.authenticate(username, password);
+  if (!authenticated) {
     res.redirect('/login');
     return;
   }
@@ -761,7 +911,10 @@ app.post('/login', loginRateLimiter, async (req, res) => {
     }
 
     req.session.authenticated = true;
-    req.session.username = username;
+    req.session.userId = authenticated.user.id;
+    req.session.username = authenticated.user.username;
+    req.session.role = authenticated.user.role;
+    req.session.mustSetup = authenticated.type === 'bootstrap';
     req.session.save((saveError) => {
       if (saveError) {
         console.error('Error saving session after login:', saveError);
@@ -769,18 +922,161 @@ app.post('/login', loginRateLimiter, async (req, res) => {
         return;
       }
 
-      res.redirect('/authenticated/index.html');
+      if (authenticated.type === 'user') {
+        userStore.recordLogin(authenticated.user.id);
+      }
+
+      res.redirect(authenticated.type === 'bootstrap'
+        ? '/authenticated/settings.html?setup=1'
+        : '/authenticated/index.html');
     });
   });
 });
 
-// Root route that redirects to login if not authenticated
-app.get('/', isAuthenticated, (req, res) => {
-  res.redirect('/authenticated/index.html');
+app.post('/logout', isAuthenticated, (req, res) => {
+  req.session.destroy(() => {
+    res.redirect('/login');
+  });
 });
 
+app.post('/api/setup/admin', isAuthenticated, (req, res) => {
+  if (!isBootstrapSession(req) || !isSetupRequired()) {
+    res.status(400).json({ success: false, message: 'Initial setup is not available.' });
+    return;
+  }
+
+  try {
+    const user = userStore.createInitialAdmin({
+      username: req.body.username,
+      password: req.body.password
+    });
+
+    req.session.userId = user.id;
+    req.session.username = user.username;
+    req.session.role = user.role;
+    req.session.mustSetup = false;
+    userStore.recordLogin(user.id);
+    req.session.save((error) => {
+      if (error) {
+        console.error('Error saving session after initial setup:', error);
+        res.status(500).json({ success: false, message: 'Initial setup completed, but the session could not be refreshed.' });
+        return;
+      }
+
+      res.json({ success: true, user });
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message || 'Unable to create the first administrator account.' });
+  }
+});
+
+app.get('/api/users', requireAdmin, (req, res) => {
+  res.json({
+    success: true,
+    users: userStore.listUsers()
+  });
+});
+
+app.post('/api/users', requireAdmin, (req, res) => {
+  try {
+    const user = userStore.createUser({
+      username: req.body.username,
+      password: req.body.password,
+      role: req.body.role
+    });
+
+    res.status(201).json({ success: true, user });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message || 'Unable to create the user account.' });
+  }
+});
+
+app.patch('/api/users/:id', requireAdmin, (req, res) => {
+  try {
+    const user = userStore.updateUser(req.params.id, {
+      role: req.body.role,
+      isActive: req.body.isActive !== undefined ? normalizeBoolean(req.body.isActive, true) : undefined,
+      password: req.body.password
+    });
+
+    res.json({ success: true, user });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message || 'Unable to update the user account.' });
+  }
+});
+
+app.delete('/api/users/:id', requireAdmin, (req, res) => {
+  if (String(req.session.userId || '') === String(req.params.id || '')) {
+    res.status(400).json({ success: false, message: 'Delete the current account from another administrator session instead.' });
+    return;
+  }
+
+  try {
+    userStore.deleteUser(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message || 'Unable to remove the user account.' });
+  }
+});
+
+app.post('/api/account/password', isAuthenticated, (req, res) => {
+  if (isBootstrapSession(req)) {
+    res.status(400).json({ success: false, message: 'Complete initial setup before changing passwords.' });
+    return;
+  }
+
+  const currentUser = getCurrentUser(req);
+  if (!currentUser) {
+    res.status(401).json({ success: false, message: 'Authentication required.' });
+    return;
+  }
+
+  try {
+    userStore.updateOwnPassword(currentUser.id, req.body.currentPassword, req.body.newPassword);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message || 'Unable to update the password.' });
+  }
+});
+
+// Root route that redirects to login if not authenticated
+app.get('/', isAuthenticated, (req, res) => {
+  res.redirect(isBootstrapSession(req) ? '/authenticated/settings.html?setup=1' : '/authenticated/index.html');
+});
+
+function allowAuthenticatedAssetDuringSetup(requestPath) {
+  if (!requestPath) {
+    return false;
+  }
+
+  if (requestPath === '/settings.html' || requestPath === '/settings.css' || requestPath === '/settings.js') {
+    return true;
+  }
+
+  return path.extname(requestPath).toLowerCase() !== '.html';
+}
+
+function guardAuthenticatedStatic(req, res, next) {
+  if (!isSessionAuthenticated(req)) {
+    respondUnauthenticated(req, res);
+    return;
+  }
+
+  if (!isBootstrapSession(req)) {
+    next();
+    return;
+  }
+
+  if (allowAuthenticatedAssetDuringSetup(String(req.path || ''))) {
+    next();
+    return;
+  }
+
+  res.redirect('/authenticated/settings.html?setup=1');
+}
+
 // Serve authenticated content
-app.use('/authenticated', isAuthenticated, express.static(path.join(rootDir, 'authenticated')));
+app.use('/authenticated', guardAuthenticatedStatic, express.static(path.join(rootDir, 'authenticated')));
 app.use('/processed', requireCatalogAuth, express.static(processedDir));
 
 // Route to get the list of EPUBs
@@ -816,9 +1112,17 @@ app.get('/epub/:filename', requireCatalogAuth, async (req, res) => {
 });
 
 app.get('/api/reading-progress', isAuthenticated, (req, res) => {
-  const userId = getReadingProgressUser(req);
+  const currentUser = getReadingProgressUser(req);
+  if (!currentUser) {
+    res.status(401).json({ success: false, message: 'Authentication required.' });
+    return;
+  }
+
   const entries = Object.values(readingProgressDb.JSON())
-    .filter((entry) => entry && entry.userId === userId && entry.filename)
+    .filter((entry) => entry && entry.filename && (
+      entry.userId === currentUser.id ||
+      entry.userId === currentUser.username
+    ))
     .sort((left, right) => {
       const leftTime = Date.parse(left.updatedAt || 0) || 0;
       const rightTime = Date.parse(right.updatedAt || 0) || 0;
@@ -839,8 +1143,8 @@ app.get('/api/reading-progress/:filename', isAuthenticated, (req, res) => {
     return;
   }
 
-  const userId = getReadingProgressUser(req);
-  const progress = readStoredProgress(userId, filename);
+  const currentUser = getReadingProgressUser(req);
+  const progress = readStoredProgress(currentUser, filename);
   res.json({ success: true, progress });
 });
 
@@ -860,15 +1164,21 @@ app.post('/api/reading-progress/:filename', isAuthenticated, async (req, res) =>
 
   try {
     const sanitizedProgress = sanitizeProgressPayload(req.body || {});
-    const userId = getReadingProgressUser(req);
+    const currentUser = getReadingProgressUser(req);
+    if (!currentUser) {
+      res.status(401).json({ success: false, message: 'Authentication required.' });
+      return;
+    }
+
     const storedRecord = {
       ...sanitizedProgress,
       filename,
-      userId,
+      userId: currentUser.id,
+      username: currentUser.username,
       updatedAt: new Date().toISOString()
     };
 
-    readingProgressDb.set(getReadingProgressKey(userId, filename), storedRecord);
+    readingProgressDb.set(getReadingProgressKey(currentUser, filename), storedRecord);
     res.json({ success: true, progress: storedRecord });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message || 'Invalid reading progress payload.' });
@@ -876,7 +1186,7 @@ app.post('/api/reading-progress/:filename', isAuthenticated, async (req, res) =>
 });
 
 // Route to update the EPUB database
-app.post('/update-database', isAuthenticated, async (req, res) => {
+app.post('/update-database', requireAdmin, async (req, res) => {
   try {
     appendConversionLog('info', 'Manual library refresh requested.');
     await extractEpubData(processedDir);
@@ -890,7 +1200,7 @@ app.post('/update-database', isAuthenticated, async (req, res) => {
 });
 
 // Route to upload and process EPUB files
-app.post('/upload', isAuthenticated, async (req, res) => {
+app.post('/upload', requireAdmin, async (req, res) => {
   if (!req.files || !req.files.epubFiles) {
     res.status(400).json({ success: false, message: 'No EPUB files were uploaded.' });
     return;
@@ -955,7 +1265,7 @@ app.post('/upload', isAuthenticated, async (req, res) => {
 });
 
 // Route to get settings
-app.get('/settings', isAuthenticated, (req, res) => {
+app.get('/settings', requireAdmin, (req, res) => {
   try {
     res.json({
       webdavPort: String(webdavPort),
@@ -973,18 +1283,18 @@ app.get('/settings', isAuthenticated, (req, res) => {
 });
 
 // Route to update settings
-app.post('/settings', isAuthenticated, (req, res) => {
+app.post('/settings', requireAdmin, (req, res) => {
   try {
-    const currentSettings = db.JSON();
+    const currentSettings = settingsDb.JSON();
     const updates = normalizeSettingsUpdate(req.body);
     const restartSensitiveKeys = ['webdavPort', 'opdsPort', 'uploadPath', 'libraryPath', 'baseUrl'];
     const requiresRestart = Object.keys(updates).some((key) => restartSensitiveKeys.includes(key));
 
-    db.JSON({
+    settingsDb.JSON({
       ...currentSettings,
       ...updates
     });
-    db.sync();
+    settingsDb.sync();
     res.json({ success: true, requiresRestart });
   } catch (err) {
     console.error('Error updating settings:', err);
@@ -993,7 +1303,7 @@ app.post('/settings', isAuthenticated, (req, res) => {
 });
 
 // Route to restart the server
-app.post('/restart-server', isAuthenticated, (req, res) => {
+app.post('/restart-server', requireAdmin, (req, res) => {
   if (!allowServerRestart) {
     res.status(501).json({
       success: false,
@@ -1054,7 +1364,8 @@ async function startApplication() {
 
   const webdavServer = new webdav.WebDAVServer({
     httpAuthentication: new webdav.HTTPBasicAuthentication((user, pass, callback) => {
-      callback(credentialsMatch(user, pass));
+      const authenticated = userStore.authenticate(user, pass);
+      callback(Boolean(authenticated && authenticated.type === 'user'));
     }),
     privilegeManager: new webdav.SimplePathPrivilegeManager()
   });
