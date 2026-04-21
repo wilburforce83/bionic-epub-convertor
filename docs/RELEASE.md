@@ -15,9 +15,7 @@ The workflow lives at:
 It builds and pushes:
 
 - `latest`
-- the pushed git tag, for example `v1.0.0`
-- semver aliases such as `1.0.0` and `1.0`
-- a `sha-*` image tag
+- semver aliases derived from the pushed git tag, such as `1.0.0` and `1.0`
 
 It publishes multi-arch images for:
 
@@ -104,8 +102,8 @@ In GitHub Actions, check `Publish Docker Image` and confirm it succeeded.
 After the workflow finishes, confirm these image tags exist in Docker Hub:
 
 - `wilburforce83/dyslibria:latest`
-- `wilburforce83/dyslibria:v1.0.0`
 - `wilburforce83/dyslibria:1.0.0`
+- `wilburforce83/dyslibria:1.0`
 
 ## Manual Publish Trigger
 
@@ -116,7 +114,7 @@ If you need to republish without creating a new tag:
 3. Open `Publish Docker Image`
 4. Click `Run workflow`
 
-That will publish `latest` and a `sha-*` tag from the selected revision.
+That will publish `latest` from the selected revision.
 
 ## End-User Docker Path
 
@@ -135,7 +133,7 @@ docker compose up -d
 If they want to stay on a specific release, they can export or define:
 
 ```env
-IMAGE_TAG=v1.0.0
+IMAGE_TAG=1.0.0
 ```
 
 ## Release Checklist
