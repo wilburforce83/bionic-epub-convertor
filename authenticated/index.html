@@ -23,6 +23,16 @@
 
 <body class="theme-dark">
   <div class="library-app theme-dark" id="libraryApp">
+    <div class="app-notice hidden" id="libraryNotice" role="status" aria-live="polite" hidden>
+      <div class="app-notice-body">
+        <strong class="app-notice-title" id="libraryNoticeTitle">Update</strong>
+        <p class="app-notice-copy" id="libraryNoticeCopy"></p>
+      </div>
+      <button class="app-notice-dismiss" id="dismissLibraryNotice" type="button" aria-label="Dismiss message">
+        <i class="close icon" aria-hidden="true"></i>
+      </button>
+    </div>
+
     <header class="library-header">
       <div class="brand-block">
         <p class="eyebrow">Accessible self-hosted library</p>

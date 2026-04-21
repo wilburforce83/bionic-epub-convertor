@@ -24,6 +24,16 @@
 
 <body class="theme-dark">
   <div class="settings-app theme-dark" id="settingsApp">
+    <div class="app-notice hidden" id="settingsNotice" role="status" aria-live="polite" hidden>
+      <div class="app-notice-body">
+        <strong class="app-notice-title" id="settingsNoticeTitle">Update</strong>
+        <p class="app-notice-copy" id="settingsNoticeCopy"></p>
+      </div>
+      <button class="app-notice-dismiss" id="dismissSettingsNotice" type="button" aria-label="Dismiss message">
+        <i class="close icon" aria-hidden="true"></i>
+      </button>
+    </div>
+
     <header class="settings-header">
       <div class="brand-block">
         <p class="eyebrow">Accessible self-hosted library</p>
@@ -282,6 +292,18 @@
     <div class="actions">
       <button class="ui button" id="cancelDeleteLibraryButton" type="button">Cancel</button>
       <button class="ui button app-button danger" id="confirmDeleteLibraryButton" type="button">Delete all books</button>
+    </div>
+  </div>
+
+  <div class="ui small modal" id="deleteUserConfirmModal">
+    <div class="header">Delete user account</div>
+    <div class="content">
+      <p class="confirm-modal-copy" id="deleteUserConfirmCopy"></p>
+      <p class="confirm-modal-note">This removes the account immediately. Existing reading progress already stored on the server will remain.</p>
+    </div>
+    <div class="actions">
+      <button class="ui button" id="cancelDeleteUserButton" type="button">Cancel</button>
+      <button class="ui button app-button danger" id="confirmDeleteUserButton" type="button">Delete user</button>
     </div>
   </div>
 </body>

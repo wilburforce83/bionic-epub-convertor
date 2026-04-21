@@ -41,10 +41,15 @@ $(document).ready(function () {
     mobileMenuOpen: false,
     pendingPostConversionRefresh: false,
     autoRefreshInFlight: false,
-    pendingBookAction: null
+    pendingBookAction: null,
+    noticeTimer: null
   };
 
   const $app = $('#libraryApp');
+  const $libraryNotice = $('#libraryNotice');
+  const $libraryNoticeTitle = $('#libraryNoticeTitle');
+  const $libraryNoticeCopy = $('#libraryNoticeCopy');
+  const $dismissLibraryNotice = $('#dismissLibraryNotice');
   const $cards = $('#epubCards');
   const $emptyState = $('#emptyState');
   const $count = $('#libraryCount');
@@ -85,6 +90,38 @@ $(document).ready(function () {
   const $bookActionConfirmCopy = $('#bookActionConfirmCopy');
   const $bookActionConfirmNote = $('#bookActionConfirmNote');
   const $confirmBookActionButton = $('#confirmBookActionButton');
+
+  function clearNotice() {
+    if (state.noticeTimer) {
+      window.clearTimeout(state.noticeTimer);
+      state.noticeTimer = null;
+    }
+
+    $libraryNotice.prop('hidden', true).addClass('hidden').removeClass('is-success is-error');
+  }
+
+  function showNotice(message, tone, options) {
+    const variant = tone || 'info';
+    const config = options || {};
+    const timeout = config.timeout === undefined ? (variant === 'error' ? 7000 : 5000) : config.timeout;
+
+    if (state.noticeTimer) {
+      window.clearTimeout(state.noticeTimer);
+      state.noticeTimer = null;
+    }
+
+    $libraryNoticeTitle.text(config.title || (variant === 'error' ? 'Something went wrong' : 'Updated'));
+    $libraryNoticeCopy.text(message);
+    $libraryNotice
+      .prop('hidden', false)
+      .removeClass('hidden is-success is-error')
+      .toggleClass('is-success', variant === 'success')
+      .toggleClass('is-error', variant === 'error');
+
+    if (timeout > 0) {
+      state.noticeTimer = window.setTimeout(clearNotice, timeout);
+    }
+  }
 
   function randomTipDelay() {
     return 10000 + Math.floor(Math.random() * 5000);
@@ -537,6 +574,8 @@ $(document).ready(function () {
   }
 
   function bindEvents() {
+    $dismissLibraryNotice.on('click', clearNotice);
+
     $('#uploadButton').on('click', function () {
       closeMobileMenu();
       $('#uploadModal').modal('show');
@@ -559,12 +598,16 @@ $(document).ready(function () {
         contentType: false,
         success: function () {
           $('#uploadModal').modal('hide');
+          showNotice('Upload received. Dyslibria has started converting your files.', 'success');
           refreshDashboard();
           loadLogs();
         },
         error: function (xhr) {
           const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Error uploading files';
-          alert(message);
+          showNotice(message, 'error', {
+            title: 'Upload could not start',
+            timeout: 0
+          });
         }
       });
     });
@@ -731,15 +774,19 @@ $(document).ready(function () {
 
       action.request().done(function (response) {
         $bookActionConfirmModal.modal('hide');
-        alert(
+        showNotice(
           typeof action.successMessage === 'function'
             ? action.successMessage(response || {})
-            : (action.successMessage || 'Action completed.')
+            : (action.successMessage || 'Action completed.'),
+          'success'
         );
         refreshDashboard();
       }).fail(function (xhr) {
         const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Unable to complete that action.';
-        alert(message);
+        showNotice(message, 'error', {
+          title: 'Action could not finish',
+          timeout: 0
+        });
       }).always(function () {
         setButtonBusy($button, false);
       });
@@ -756,9 +803,13 @@ $(document).ready(function () {
           state.logs = [];
           renderLogs();
           loadSystemStatus();
+          showNotice('Conversion log cleared.', 'success');
         },
         error: function () {
-          alert('Error clearing logs');
+          showNotice('Error clearing logs.', 'error', {
+            title: 'Logs could not be cleared',
+            timeout: 0
+          });
         },
         complete: function () {
           setButtonBusy($button, false);
@@ -802,7 +853,10 @@ $(document).ready(function () {
     bindEvents();
 
     $.when(loadAppConfig(), loadSession(), refreshDashboard()).fail(function () {
-      alert('Error loading library');
+      showNotice('Error loading library.', 'error', {
+        title: 'Library did not load',
+        timeout: 0
+      });
     });
 
     pollSystemStatus();

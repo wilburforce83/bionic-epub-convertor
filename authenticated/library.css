@@ -52,6 +52,63 @@ textarea {
   color: var(--library-text);
 }
 
+.app-notice {
+  position: fixed;
+  right: 1.25rem;
+  bottom: max(1.25rem, env(safe-area-inset-bottom));
+  z-index: 120;
+  width: min(28rem, calc(100vw - 2rem));
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.9rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--library-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--library-surface);
+  color: var(--library-text);
+  box-shadow: var(--library-shadow);
+  backdrop-filter: blur(16px);
+}
+
+.app-notice-body {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.app-notice-title,
+.app-notice-copy {
+  margin: 0;
+}
+
+.app-notice-title {
+  font-size: 0.95rem;
+}
+
+.app-notice-copy {
+  line-height: 1.55;
+}
+
+.app-notice-dismiss {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0.15rem;
+  line-height: 1;
+}
+
+.app-notice.is-success {
+  background: rgba(237, 248, 240, 0.98);
+  border-color: rgba(95, 146, 110, 0.28);
+}
+
+.app-notice.is-error {
+  background: rgba(255, 241, 239, 0.98);
+  border-color: rgba(190, 95, 84, 0.28);
+}
+
 body.theme-dark {
   --library-bg: linear-gradient(180deg, #171312 0%, #221c1a 100%);
   --library-surface: rgba(24, 20, 18, 0.95);
@@ -62,6 +119,16 @@ body.theme-dark {
   --library-muted: #c8b5ac;
   --library-chip: rgba(36, 29, 27, 0.95);
   --library-chip-muted: rgba(42, 34, 31, 0.96);
+}
+
+body.theme-dark .app-notice.is-success {
+  background: rgba(30, 49, 37, 0.94);
+  border-color: rgba(132, 205, 151, 0.24);
+}
+
+body.theme-dark .app-notice.is-error {
+  background: rgba(64, 28, 25, 0.95);
+  border-color: rgba(233, 130, 119, 0.24);
 }
 
 .library-header {
@@ -816,6 +883,12 @@ body.theme-dark .logs-output {
 }
 
 @media (max-width: 1039px) {
+  .app-notice {
+    left: 1rem;
+    right: 1rem;
+    width: auto;
+  }
+
   .hero-panel {
     grid-template-columns: 1fr;
   }
@@ -849,6 +922,12 @@ body.theme-dark .logs-output {
   .library-app {
     padding-left: 0.8rem;
     padding-right: 0.8rem;
+  }
+
+  .app-notice {
+    left: 0.8rem;
+    right: 0.8rem;
+    bottom: max(0.8rem, env(safe-area-inset-bottom));
   }
 
   .library-header,

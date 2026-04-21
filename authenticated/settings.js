@@ -9,10 +9,16 @@ $(document).ready(function () {
     session: null,
     settings: null,
     users: [],
-    mobileMenuOpen: false
+    mobileMenuOpen: false,
+    noticeTimer: null,
+    pendingDeleteUser: null
   };
 
   const $app = $('#settingsApp');
+  const $settingsNotice = $('#settingsNotice');
+  const $settingsNoticeTitle = $('#settingsNoticeTitle');
+  const $settingsNoticeCopy = $('#settingsNoticeCopy');
+  const $dismissSettingsNotice = $('#dismissSettingsNotice');
   const $currentUserBadge = $('#currentUserBadge');
   const $themeModeBadge = $('#themeModeBadge');
   const $settingsHeading = $('#settingsHeading');
@@ -37,6 +43,9 @@ $(document).ready(function () {
   const $deleteLibraryConfirmCopy = $('#deleteLibraryConfirmCopy');
   const $deleteLibraryConfirmNote = $('#deleteLibraryConfirmNote');
   const $confirmDeleteLibraryButton = $('#confirmDeleteLibraryButton');
+  const $deleteUserConfirmModal = $('#deleteUserConfirmModal');
+  const $deleteUserConfirmCopy = $('#deleteUserConfirmCopy');
+  const $confirmDeleteUserButton = $('#confirmDeleteUserButton');
 
   if (window.DyslibriaPwa) {
     window.DyslibriaPwa.bindInstallButton($settingsInstallButton.get(0));
@@ -45,6 +54,38 @@ $(document).ready(function () {
   function setButtonBusy($button, busy) {
     $button.prop('disabled', busy);
     $button.toggleClass('loading', busy);
+  }
+
+  function clearNotice() {
+    if (state.noticeTimer) {
+      window.clearTimeout(state.noticeTimer);
+      state.noticeTimer = null;
+    }
+
+    $settingsNotice.prop('hidden', true).addClass('hidden').removeClass('is-success is-error');
+  }
+
+  function showNotice(message, tone, options) {
+    const variant = tone || 'info';
+    const config = options || {};
+    const timeout = config.timeout === undefined ? (variant === 'error' ? 7000 : 5000) : config.timeout;
+
+    if (state.noticeTimer) {
+      window.clearTimeout(state.noticeTimer);
+      state.noticeTimer = null;
+    }
+
+    $settingsNoticeTitle.text(config.title || (variant === 'error' ? 'Something went wrong' : 'Updated'));
+    $settingsNoticeCopy.text(message);
+    $settingsNotice
+      .prop('hidden', false)
+      .removeClass('hidden is-success is-error')
+      .toggleClass('is-success', variant === 'success')
+      .toggleClass('is-error', variant === 'error');
+
+    if (timeout > 0) {
+      state.noticeTimer = window.setTimeout(clearNotice, timeout);
+    }
   }
 
   function closeMobileMenu() {
@@ -296,6 +337,8 @@ $(document).ready(function () {
       }
     });
 
+    $dismissSettingsNotice.on('click', clearNotice);
+
     $('#setupForm').on('submit', function (event) {
       event.preventDefault();
       const $button = $('#completeSetupButton');
@@ -304,7 +347,10 @@ $(document).ready(function () {
       const confirmPassword = $(this).find('input[name="confirmPassword"]').val();
 
       if (password !== confirmPassword) {
-        alert('The passwords do not match.');
+        showNotice('The passwords do not match.', 'error', {
+          title: 'Check the passwords',
+          timeout: 0
+        });
         return;
       }
 
@@ -314,7 +360,10 @@ $(document).ready(function () {
         window.location.href = '/authenticated/index.html';
       }).fail(function (xhr) {
         const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Unable to complete the initial setup.';
-        alert(message);
+        showNotice(message, 'error', {
+          title: 'Setup could not finish',
+          timeout: 0
+        });
       }).always(function () {
         setButtonBusy($button, false);
       });
@@ -328,7 +377,10 @@ $(document).ready(function () {
       const confirmNewPassword = $(this).find('input[name="confirmNewPassword"]').val();
 
       if (newPassword !== confirmNewPassword) {
-        alert('The new passwords do not match.');
+        showNotice('The new passwords do not match.', 'error', {
+          title: 'Check the passwords',
+          timeout: 0
+        });
         return;
       }
 
@@ -336,10 +388,13 @@ $(document).ready(function () {
 
       $.post('/api/account/password', { currentPassword, newPassword }, () => {
         this.reset();
-        alert('Password updated.');
+        showNotice('Password updated.', 'success');
       }).fail(function (xhr) {
         const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Unable to update the password.';
-        alert(message);
+        showNotice(message, 'error', {
+          title: 'Password was not updated',
+          timeout: 0
+        });
       }).always(function () {
         setButtonBusy($button, false);
       });
@@ -355,14 +410,18 @@ $(document).ready(function () {
       $.post('/settings', payload, function (response) {
         state.themeColorKey = $themeColorSelect.val() || state.themeColorKey;
         applyTheme();
-        alert(
+        showNotice(
           response && response.requiresRestart
             ? 'Settings saved. Restart Dyslibria for path, port, or base URL changes to take effect.'
-            : 'Settings saved.'
+            : 'Settings saved.',
+          'success'
         );
       }).fail(function (xhr) {
         const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Unable to save settings.';
-        alert(message);
+        showNotice(message, 'error', {
+          title: 'Settings were not saved',
+          timeout: 0
+        });
       }).always(function () {
         setButtonBusy($button, false);
       });
@@ -373,10 +432,13 @@ $(document).ready(function () {
       setButtonBusy($button, true);
 
       $.post('/restart-server', function () {
-        alert('Server restart requested.');
+        showNotice('Server restart requested.', 'success');
       }).fail(function (xhr) {
         const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Server restart is disabled or failed.';
-        alert(message);
+        showNotice(message, 'error', {
+          title: 'Restart could not be requested',
+          timeout: 0
+        });
       }).always(function () {
         setButtonBusy($button, false);
       });
@@ -387,10 +449,13 @@ $(document).ready(function () {
       setButtonBusy($button, true);
 
       $.post('/update-database', function () {
-        alert('Library refresh completed.');
+        showNotice('Library refresh completed.', 'success');
       }).fail(function (xhr) {
         const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Unable to refresh the library.';
-        alert(message);
+        showNotice(message, 'error', {
+          title: 'Refresh could not finish',
+          timeout: 0
+        });
       }).always(function () {
         setButtonBusy($button, false);
       });
@@ -436,7 +501,7 @@ $(document).ready(function () {
         },
         success: function (response) {
           $deleteLibraryConfirmModal.modal('hide');
-          alert(
+          showNotice(
             response && response.deletedCount === 0
               ? (
                 removeReadingProgress
@@ -448,11 +513,16 @@ $(document).ready(function () {
                   ? `Deleted ${response.deletedCount} book${response.deletedCount === 1 ? '' : 's'} and cleared all reading progress.`
                   : `Deleted ${response.deletedCount} book${response.deletedCount === 1 ? '' : 's'}. Saved reading progress was kept.`
               )
+            ,
+            'success'
           );
         },
         error: function (xhr) {
           const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Unable to delete the library contents.';
-          alert(message);
+          showNotice(message, 'error', {
+            title: 'Library could not be deleted',
+            timeout: 0
+          });
         },
         complete: function () {
           setButtonBusy($button, false);
@@ -473,10 +543,14 @@ $(document).ready(function () {
 
       $.post('/api/users', payload, function () {
         $('#createUserForm').get(0).reset();
+        showNotice(`Added ${payload.username}.`, 'success');
         loadUsers();
       }).fail(function (xhr) {
         const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Unable to create the user.';
-        alert(message);
+        showNotice(message, 'error', {
+          title: 'User could not be created',
+          timeout: 0
+        });
       }).always(function () {
         setButtonBusy($button, false);
       });
@@ -499,11 +573,15 @@ $(document).ready(function () {
         type: 'PATCH',
         data: payload,
         success: function () {
+          showNotice('Account updated.', 'success');
           loadUsers();
         },
         error: function (xhr) {
           const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Unable to update the user.';
-          alert(message);
+          showNotice(message, 'error', {
+            title: 'Account could not be updated',
+            timeout: 0
+          });
         },
         complete: function () {
           setButtonBusy($button, false);
@@ -519,25 +597,65 @@ $(document).ready(function () {
 
       const $card = $button.closest('.user-card');
       const userId = $card.data('user-id');
+      const username = String($card.find('h3').text() || 'this user');
 
-      if (!window.confirm('Delete this user account?')) {
+      state.pendingDeleteUser = {
+        id: userId,
+        username,
+        button: $button
+      };
+
+      $deleteUserConfirmCopy.text(`Delete "${username}" from Dyslibria?`);
+      $deleteUserConfirmModal.modal({
+        closable: false,
+        autofocus: false,
+        onHidden: function () {
+          if (state.pendingDeleteUser && state.pendingDeleteUser.button) {
+            setButtonBusy(state.pendingDeleteUser.button, false);
+          }
+
+          setButtonBusy($confirmDeleteUserButton, false);
+          state.pendingDeleteUser = null;
+        }
+      }).modal('show');
+    });
+
+    $('#cancelDeleteUserButton').on('click', function () {
+      $deleteUserConfirmModal.modal('hide');
+    });
+
+    $confirmDeleteUserButton.on('click', function () {
+      const pendingDeleteUser = state.pendingDeleteUser;
+      const $button = $(this);
+
+      if (!pendingDeleteUser || !pendingDeleteUser.id) {
         return;
       }
 
       setButtonBusy($button, true);
+      setButtonBusy(pendingDeleteUser.button, true);
 
       $.ajax({
-        url: `/api/users/${encodeURIComponent(userId)}`,
+        url: `/api/users/${encodeURIComponent(pendingDeleteUser.id)}`,
         type: 'DELETE',
         success: function () {
+          $deleteUserConfirmModal.modal('hide');
+          showNotice(`Deleted ${pendingDeleteUser.username}.`, 'success');
           loadUsers();
         },
         error: function (xhr) {
           const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Unable to delete the user.';
-          alert(message);
+          showNotice(message, 'error', {
+            title: 'User could not be deleted',
+            timeout: 0
+          });
         },
         complete: function () {
           setButtonBusy($button, false);
+
+          if (state.pendingDeleteUser && state.pendingDeleteUser.button) {
+            setButtonBusy(state.pendingDeleteUser.button, false);
+          }
         }
       });
     });
@@ -566,7 +684,10 @@ $(document).ready(function () {
 
       return $.Deferred().resolve().promise();
     }).fail(function () {
-      alert('Unable to load the settings page.');
+      showNotice('Unable to load the settings page.', 'error', {
+        title: 'Settings did not load',
+        timeout: 0
+      });
     });
   }
 
