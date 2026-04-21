@@ -1,8 +1,9 @@
-const STATIC_CACHE = 'dyslibria-assets-v13';
+const STATIC_CACHE = 'dyslibria-assets-v15';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/app-theme.js',
   '/offline.html',
+  '/favicon.ico',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
   '/icons/icon-maskable-192x192.png',

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Dyslibria app icon</title>
+  <desc id="desc">Dys in ember orange and libria in white on a dark background.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#171312"/>
+      <stop offset="100%" stop-color="#221c1a"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="220" fill="url(#bg)"/>
+  <g font-family="'Avenir Next', Avenir, Helvetica, Arial, sans-serif" text-anchor="middle">
+    <text x="512" y="480" font-size="272" font-weight="600" letter-spacing="-18" fill="#d05834">Dys</text>
+    <text x="512" y="680" font-size="212" font-weight="400" letter-spacing="-10" fill="#f7eee8">libria</text>
+  </g>
+</svg>
