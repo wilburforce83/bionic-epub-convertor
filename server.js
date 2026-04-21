@@ -1561,6 +1561,35 @@ app.post('/upload', requireAdmin, async (req, res) => {
   appendConversionLog('info', `Accepted ${queuedFiles.length} upload${queuedFiles.length === 1 ? '' : 's'} into the conversion queue.`);
 });
 
+app.use((error, req, res, next) => {
+  if (!error) {
+    next();
+    return;
+  }
+
+  if (res.headersSent) {
+    next(error);
+    return;
+  }
+
+  if (error.status === 413 || error.statusCode === 413) {
+    const uploadLimitMb = Math.max(1, Math.round(MAX_UPLOAD_BYTES / (1024 * 1024)));
+    const message = String(req.path || '') === '/upload'
+      ? `Upload request too large. Dyslibria now retries large selections in smaller batches automatically, but a single EPUB may still exceed the server limit. Keep each EPUB under about ${uploadLimitMb} MB or increase the proxy/body-size limit.`
+      : 'Request body too large.';
+
+    if (String(req.path || '').startsWith('/api/') || String(req.path || '') === '/upload' || req.accepts('json')) {
+      res.status(413).json({ success: false, message });
+      return;
+    }
+
+    res.status(413).type('text/plain').send(message);
+    return;
+  }
+
+  next(error);
+});
+
 // Route to get settings
 app.get('/settings', requireAdmin, (req, res) => {
   try {

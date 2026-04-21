@@ -74,6 +74,7 @@ The upload modal supports:
 - file picker upload
 - drag and drop
 - multiple EPUB files at once
+- automatic splitting of large selections into smaller upload batches
 
 After upload:
 

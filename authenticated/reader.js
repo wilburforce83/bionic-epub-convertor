@@ -58,6 +58,7 @@
 
   const elements = {
     app: document.getElementById('readerApp'),
+    viewerFrame: document.querySelector('.viewer-frame'),
     loadingTitle: document.getElementById('loadingTitle'),
     loadingMeta: document.getElementById('loadingMeta'),
     loadingProgressLabel: document.getElementById('loadingProgressLabel'),
@@ -366,6 +367,26 @@
     return window.innerWidth >= 1200 ? 'always' : 'none';
   }
 
+  function getReaderPageMargins() {
+    const pageMargin = Math.max(3, Math.min(12, Number(settings.pageMargin) || defaultSettings.pageMargin));
+    const verticalPageMargin = Math.max(2.5, Math.min(10, pageMargin - (window.innerWidth < 700 ? 0.2 : 0.8)));
+
+    return {
+      inline: pageMargin,
+      block: verticalPageMargin
+    };
+  }
+
+  function applyViewerMargins() {
+    if (!elements.viewerFrame) {
+      return;
+    }
+
+    const margins = getReaderPageMargins();
+    elements.viewerFrame.style.setProperty('--reader-page-inline-margin', `${margins.inline}%`);
+    elements.viewerFrame.style.setProperty('--reader-page-block-margin', `${margins.block}%`);
+  }
+
   function resizeRendition() {
     if (!rendition || !rendition.manager || !rendition.manager.isRendered()) {
       return;
@@ -598,9 +619,8 @@
         : ((appPalette && appPalette.linkLight) || baseTheme.link)
     };
     const fontFamily = fontFamilies[settings.fontFamily] || fontFamilies.accessible;
-    const pageMargin = Math.max(3, Math.min(12, Number(settings.pageMargin) || defaultSettings.pageMargin));
-    const verticalPageMargin = Math.max(2.5, Math.min(10, pageMargin - (window.innerWidth < 700 ? 0.2 : 0.8)));
-    const pagePadding = `${verticalPageMargin}% ${pageMargin}%`;
+
+    applyViewerMargins();
 
     rendition.themes.default({
       'html, body': {
@@ -619,7 +639,7 @@
         'font-weight': '400',
         'text-rendering': 'optimizeLegibility',
         margin: '0',
-        padding: pagePadding,
+        padding: '0',
         '-webkit-user-select': 'none',
         '-moz-user-select': 'none',
         'user-select': 'none',
@@ -961,6 +981,7 @@
     await loadAppConfig();
     updateSettingLabels();
     applyShellTheme();
+    applyViewerMargins();
     attachEventListeners();
 
     try {

@@ -4,6 +4,8 @@ $(document).ready(function () {
   const LIBRARY_CACHE_KEY = 'dyslibria:library-cache:v1';
   const LIBRARY_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
   const LIBRARY_RENDER_BATCH_SIZE = 24;
+  const UPLOAD_BATCH_MAX_BYTES = 32 * 1024 * 1024;
+  const UPLOAD_BATCH_MAX_FILES = 12;
   const TIPS = [
     {
       title: 'Reader zones',
@@ -215,6 +217,272 @@ $(document).ready(function () {
     });
   }
 
+  function calculateUploadPercent(loadedBytes, totalBytes) {
+    if (totalBytes <= 0) {
+      return 0;
+    }
+
+    return Math.max(0, Math.min(100, Math.round((loadedBytes / totalBytes) * 100)));
+  }
+
+  function createUploadBatch(files) {
+    const batchFiles = Array.isArray(files) ? files.slice() : [];
+    return {
+      files: batchFiles,
+      summary: summarizeFiles(batchFiles)
+    };
+  }
+
+  function buildUploadBatches(files) {
+    const batches = [];
+    let currentBatchFiles = [];
+    let currentBatchBytes = 0;
+
+    files.forEach(function (file) {
+      const fileSize = Number(file && file.size) || 0;
+      const wouldExceedFileLimit = currentBatchFiles.length >= UPLOAD_BATCH_MAX_FILES;
+      const wouldExceedByteLimit = currentBatchFiles.length > 0 && currentBatchBytes + fileSize > UPLOAD_BATCH_MAX_BYTES;
+
+      if (currentBatchFiles.length && (wouldExceedFileLimit || wouldExceedByteLimit)) {
+        batches.push(createUploadBatch(currentBatchFiles));
+        currentBatchFiles = [];
+        currentBatchBytes = 0;
+      }
+
+      currentBatchFiles.push(file);
+      currentBatchBytes += fileSize;
+    });
+
+    if (currentBatchFiles.length) {
+      batches.push(createUploadBatch(currentBatchFiles));
+    }
+
+    return batches;
+  }
+
+  function splitUploadBatch(batch) {
+    const batchFiles = batch && Array.isArray(batch.files) ? batch.files : [];
+    if (batchFiles.length < 2) {
+      return [createUploadBatch(batchFiles)];
+    }
+
+    const midpoint = Math.ceil(batchFiles.length / 2);
+    return [
+      createUploadBatch(batchFiles.slice(0, midpoint)),
+      createUploadBatch(batchFiles.slice(midpoint))
+    ].filter(function (entry) {
+      return entry.files.length > 0;
+    });
+  }
+
+  function collectBatchFiles(batches) {
+    return (Array.isArray(batches) ? batches : []).reduce(function (files, batch) {
+      const batchFiles = batch && Array.isArray(batch.files) ? batch.files : [];
+      return files.concat(batchFiles);
+    }, []);
+  }
+
+  function replaceSelectedUploadFiles(files) {
+    const input = $fileInput.get(0);
+    if (!input || typeof DataTransfer === 'undefined') {
+      return false;
+    }
+
+    try {
+      const transfer = new DataTransfer();
+      (Array.isArray(files) ? files : []).forEach(function (file) {
+        transfer.items.add(file);
+      });
+      input.files = transfer.files;
+      syncSelectedFilesUi();
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function getUploadBatchLabel(position) {
+    if (position && position.total > 1) {
+      return `Batch ${position.current} of ${position.total}`;
+    }
+
+    return 'Upload batch';
+  }
+
+  function buildUploadMetaText(batch, batchPosition, totalSelectedBytes) {
+    const batchFileCount = batch && batch.summary ? batch.summary.count : 0;
+    const batchLabel = getUploadBatchLabel(batchPosition);
+    const batchSize = formatBytes(batch && batch.summary ? batch.summary.totalBytes : 0);
+    const totalSize = formatBytes(totalSelectedBytes);
+
+    return `${batchLabel} · ${batchFileCount} EPUB${batchFileCount === 1 ? '' : 's'} · ${batchSize} in this batch · ${totalSize} selected total.`;
+  }
+
+  function updateBatchUploadProgress(batch, overallSummary, batchPosition, acceptedBytes, progressEvent) {
+    const totalSelectedBytes = Number(overallSummary && overallSummary.totalBytes) || 0;
+    const batchLabel = getUploadBatchLabel(batchPosition);
+    const batchTitle = overallSummary.count > 1 ? `Uploading ${overallSummary.count} books` : `Uploading ${batch.files[0].name}`;
+
+    if (!progressEvent.lengthComputable || progressEvent.total <= 0) {
+      setUploadProgressState({
+        percent: calculateUploadPercent(acceptedBytes, totalSelectedBytes),
+        title: batchTitle,
+        copy: `${batchLabel} is uploading. Dyslibria will automatically retry smaller batches if this request is too large.`,
+        meta: buildUploadMetaText(batch, batchPosition, totalSelectedBytes)
+      });
+      return;
+    }
+
+    const batchFraction = Math.max(0, Math.min(1, progressEvent.loaded / progressEvent.total));
+    const transferredBytes = acceptedBytes + Math.round(batch.summary.totalBytes * batchFraction);
+    const percent = calculateUploadPercent(transferredBytes, totalSelectedBytes);
+    const copy = batchFraction >= 1
+      ? `${batchLabel} uploaded. Dyslibria is validating the files and adding them to the queue.`
+      : `${formatBytes(transferredBytes)} of ${formatBytes(totalSelectedBytes)} uploaded.`;
+
+    setUploadProgressState({
+      percent,
+      title: batchTitle,
+      copy,
+      meta: buildUploadMetaText(batch, batchPosition, totalSelectedBytes)
+    });
+  }
+
+  function getUploadErrorMessage(errorPayload) {
+    const xhr = errorPayload && errorPayload.xhr;
+    const acceptedCount = Number(errorPayload && errorPayload.acceptedCount) || 0;
+    const remainingFiles = Array.isArray(errorPayload && errorPayload.remainingFiles) ? errorPayload.remainingFiles : [];
+    const batch = errorPayload && errorPayload.batch;
+
+    if (xhr && xhr.status === 413) {
+      const partialPrefix = acceptedCount > 0
+        ? `${acceptedCount} book${acceptedCount === 1 ? '' : 's'} already reached the queue. `
+        : '';
+      const retainPrefix = remainingFiles.length > 0
+        ? `${remainingFiles.length} unfinished book${remainingFiles.length === 1 ? '' : 's'} still need to be queued. `
+        : '';
+      const batchScope = batch && batch.summary && batch.summary.count > 1
+        ? `The current upload batch (${batch.summary.count} EPUBs, ${formatBytes(batch.summary.totalBytes)}) was too large for the server or reverse proxy to accept.`
+        : 'This EPUB was too large for the server or reverse proxy to accept.';
+
+      return `${partialPrefix}${retainPrefix}${batchScope} Try a smaller upload or increase the request body limit on the server or proxy.`;
+    }
+
+    const responseMessage = xhr && xhr.responseJSON && xhr.responseJSON.message;
+    if (responseMessage) {
+      return responseMessage;
+    }
+
+    const plainTextResponse = String(xhr && xhr.responseText || '').trim();
+    if (plainTextResponse && !plainTextResponse.startsWith('<')) {
+      return plainTextResponse;
+    }
+
+    return 'Error uploading files.';
+  }
+
+  function uploadBatchRequest(batch, overallSummary, batchPosition, acceptedBytes) {
+    const formData = new FormData();
+    batch.files.forEach(function (file) {
+      formData.append('epubFiles', file, file.name);
+    });
+
+    return new Promise(function (resolve, reject) {
+      $.ajax({
+        url: '/upload',
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        xhr: function () {
+          const xhr = $.ajaxSettings.xhr();
+
+          if (xhr && xhr.upload) {
+            xhr.upload.addEventListener('progress', function (progressEvent) {
+              updateBatchUploadProgress(batch, overallSummary, batchPosition, acceptedBytes, progressEvent);
+            });
+          }
+
+          return xhr;
+        },
+        success: function (response) {
+          resolve(response || {});
+        },
+        error: function (xhr) {
+          reject(xhr);
+        }
+      });
+    });
+  }
+
+  async function uploadSelectedFiles(selectedFiles) {
+    const overallSummary = summarizeFiles(selectedFiles);
+    const pendingBatches = buildUploadBatches(selectedFiles);
+    const queuedFiles = [];
+    let acceptedCount = 0;
+    let acceptedBytes = 0;
+    let completedBatchCount = 0;
+
+    while (pendingBatches.length) {
+      const batch = pendingBatches.shift();
+      const batchPosition = {
+        current: completedBatchCount + 1,
+        total: completedBatchCount + pendingBatches.length + 1
+      };
+
+      try {
+        const response = await uploadBatchRequest(batch, overallSummary, batchPosition, acceptedBytes);
+
+        acceptedCount += batch.summary.count;
+        acceptedBytes += batch.summary.totalBytes;
+        completedBatchCount += 1;
+
+        if (Array.isArray(response && response.queuedFiles)) {
+          queuedFiles.push.apply(queuedFiles, response.queuedFiles);
+        }
+
+        if (pendingBatches.length) {
+          setUploadProgressState({
+            percent: calculateUploadPercent(acceptedBytes, overallSummary.totalBytes),
+            title: acceptedCount === overallSummary.count
+              ? `${acceptedCount} books queued`
+              : `${acceptedCount} of ${overallSummary.count} books queued`,
+            copy: `${getUploadBatchLabel(batchPosition)} accepted. Starting the next batch now.`,
+            meta: `${pendingBatches.length} upload batch${pendingBatches.length === 1 ? '' : 'es'} remaining.`
+          });
+        }
+      } catch (xhr) {
+        if (xhr && xhr.status === 413 && batch.summary.count > 1) {
+          const smallerBatches = splitUploadBatch(batch);
+          Array.prototype.unshift.apply(pendingBatches, smallerBatches);
+          setUploadProgressState({
+            percent: calculateUploadPercent(acceptedBytes, overallSummary.totalBytes),
+            title: 'Retrying with smaller batches',
+            copy: `${getUploadBatchLabel(batchPosition)} was too large for the server. Dyslibria is retrying with smaller groups automatically.`,
+            meta: `${acceptedCount} of ${overallSummary.count} books queued so far.`
+          });
+          continue;
+        }
+
+        throw {
+          xhr,
+          batch,
+          acceptedCount,
+          acceptedBytes,
+          remainingFiles: batch.files.concat(collectBatchFiles(pendingBatches)),
+          queuedFiles
+        };
+      }
+    }
+
+    return {
+      acceptedCount,
+      acceptedBytes,
+      overallSummary,
+      queuedFiles
+    };
+  }
+
   function setUploadBusy(busy) {
     state.uploading = Boolean(busy);
     setButtonBusy($uploadSubmitButton, state.uploading);
@@ -251,7 +519,7 @@ $(document).ready(function () {
       percent: 0,
       title: files.length > 1 ? `${files.length} books selected` : files[0].name,
       copy: `Ready to upload ${summary.count} EPUB${summary.count === 1 ? '' : 's'} into Dyslibria's conversion queue.`,
-      meta: `${formatBytes(summary.totalBytes)} total. Click "Convert and add to library" when you're ready.`
+      meta: `${formatBytes(summary.totalBytes)} total. Large selections are sent in smaller batches automatically.`
     });
   }
 
@@ -963,7 +1231,7 @@ $(document).ready(function () {
       window.location.href = 'settings.html';
     });
 
-    $uploadForm.on('submit', function (event) {
+    $uploadForm.on('submit', async function (event) {
       event.preventDefault();
       const selectedFiles = getSelectedUploadFiles();
       const fileSummary = summarizeFiles(selectedFiles);
@@ -982,95 +1250,63 @@ $(document).ready(function () {
         return;
       }
 
-      const formData = new FormData(this);
       setUploadBusy(true);
       setUploadProgressState({
         percent: 0,
         title: fileSummary.count > 1 ? `Uploading ${fileSummary.count} books` : `Uploading ${selectedFiles[0].name}`,
-        copy: 'Sending files to Dyslibria. Keep this window open until the queue confirmation appears.',
+        copy: 'Sending files to Dyslibria. Large selections are split into smaller batches automatically.',
         meta: `${formatBytes(fileSummary.totalBytes)} total selected.`
       });
 
-      $.ajax({
-        url: '/upload',
-        type: 'POST',
-        data: formData,
-        processData: false,
-        contentType: false,
-        xhr: function () {
-          const xhr = $.ajaxSettings.xhr();
+      try {
+        const result = await uploadSelectedFiles(selectedFiles);
+        const queuedCount = Array.isArray(result && result.queuedFiles) && result.queuedFiles.length
+          ? result.queuedFiles.length
+          : fileSummary.count;
 
-          if (xhr && xhr.upload) {
-            xhr.upload.addEventListener('progress', function (progressEvent) {
-              if (!progressEvent.lengthComputable) {
-                setUploadProgressState({
-                  percent: 0,
-                  title: fileSummary.count > 1 ? `Uploading ${fileSummary.count} books` : `Uploading ${selectedFiles[0].name}`,
-                  copy: 'Sending files to Dyslibria. Upload size is still being calculated.',
-                  meta: `${formatBytes(fileSummary.totalBytes)} total selected.`
-                });
-                return;
-              }
+        setUploadProgressState({
+          percent: 100,
+          title: queuedCount === 1 ? '1 book queued' : `${queuedCount} books queued`,
+          copy: 'Upload complete. Dyslibria has accepted every batch and started conversion work.',
+          meta: 'You can follow conversion progress from the queue status pill and the conversion log.'
+        });
+        window.setTimeout(function () {
+          $uploadModal.modal('hide');
+        }, 320);
+        showNotice(
+          queuedCount === 1
+            ? 'Upload received. Dyslibria has started converting your book.'
+            : `Upload received. Dyslibria has started converting ${queuedCount} books.`,
+          'success'
+        );
+        refreshDashboard();
+        loadLogs();
+      } catch (errorPayload) {
+        const message = getUploadErrorMessage(errorPayload);
+        const retainedRemainingFiles = errorPayload && errorPayload.acceptedCount > 0
+          ? replaceSelectedUploadFiles(errorPayload.remainingFiles)
+          : false;
+        const acceptedCount = Number(errorPayload && errorPayload.acceptedCount) || 0;
+        const acceptedBytes = Number(errorPayload && errorPayload.acceptedBytes) || 0;
 
-              const percent = progressEvent.total > 0
-                ? Math.round((progressEvent.loaded / progressEvent.total) * 100)
-                : 0;
-
-              setUploadProgressState({
-                percent,
-                title: fileSummary.count > 1 ? `Uploading ${fileSummary.count} books` : `Uploading ${selectedFiles[0].name}`,
-                copy: percent >= 100
-                  ? 'Upload complete. Dyslibria is now validating the files and adding them to the conversion queue.'
-                  : `${formatBytes(progressEvent.loaded)} of ${formatBytes(progressEvent.total)} uploaded.`,
-                meta: fileSummary.count > 1
-                  ? `${fileSummary.count} EPUBs in this batch.`
-                  : '1 EPUB in this batch.'
-              });
-            });
-          }
-
-          return xhr;
-        },
-        success: function (response) {
-          const queuedCount = Array.isArray(response && response.queuedFiles) ? response.queuedFiles.length : fileSummary.count;
-
-          setUploadProgressState({
-            percent: 100,
-            title: queuedCount === 1 ? '1 book queued' : `${queuedCount} books queued`,
-            copy: 'Upload complete. Dyslibria has accepted the batch and started conversion work.',
-            meta: 'You can follow conversion progress from the queue status pill and the conversion log.'
-          });
-          setUploadBusy(false);
-          window.setTimeout(function () {
-            $uploadModal.modal('hide');
-          }, 320);
-          showNotice(
-            queuedCount === 1
-              ? 'Upload received. Dyslibria has started converting your book.'
-              : `Upload received. Dyslibria has started converting ${queuedCount} books.`,
-            'success'
-          );
-          refreshDashboard();
-          loadLogs();
-        },
-        error: function (xhr) {
-          const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Error uploading files';
-          setUploadProgressState({
-            percent: Math.max(Number($uploadProgressPercent.text().replace('%', '')) || 0, 0),
-            title: 'Upload did not finish',
-            copy: message,
-            meta: 'Review the message, adjust the batch if needed, and try again.',
-            tone: 'error'
-          });
-          showNotice(message, 'error', {
-            title: 'Upload could not start',
-            timeout: 0
-          });
-        },
-        complete: function () {
-          setUploadBusy(false);
-        }
-      });
+        setUploadProgressState({
+          percent: calculateUploadPercent(acceptedBytes, fileSummary.totalBytes),
+          title: 'Upload did not finish',
+          copy: message,
+          meta: acceptedCount > 0
+            ? retainedRemainingFiles
+              ? `${acceptedCount} book${acceptedCount === 1 ? '' : 's'} already reached the queue. The unfinished files are still selected so you can retry just those.`
+              : `${acceptedCount} book${acceptedCount === 1 ? '' : 's'} already reached the queue. Re-select the unfinished files before retrying.`
+            : 'Review the message, adjust the batch if needed, and try again.',
+          tone: 'error'
+        });
+        showNotice(message, 'error', {
+          title: acceptedCount > 0 ? 'Upload only finished partially' : 'Upload could not start',
+          timeout: 0
+        });
+      } finally {
+        setUploadBusy(false);
+      }
     });
 
     $dropZone.on('dragover', function (event) {
