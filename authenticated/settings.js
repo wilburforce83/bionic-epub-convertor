@@ -11,7 +11,11 @@ $(document).ready(function () {
     users: [],
     mobileMenuOpen: false,
     noticeTimer: null,
-    pendingDeleteUser: null
+    pendingDeleteUser: null,
+    currentVersion: '',
+    latestVersion: '',
+    updateAvailable: false,
+    updateNoticeShown: false
   };
 
   const $app = $('#settingsApp');
@@ -189,6 +193,38 @@ $(document).ready(function () {
     $dangerSection.prop('hidden', user.role !== 'admin');
   }
 
+  function maybeShowUpdateNotice() {
+    if (state.updateNoticeShown || !state.session || !state.session.canManageSystem || !state.updateAvailable) {
+      return;
+    }
+
+    if (!state.currentVersion || !state.latestVersion) {
+      return;
+    }
+
+    showNotice(`Version ${state.latestVersion} is available. You're running ${state.currentVersion}.`, 'info', {
+      title: 'Update available',
+      timeout: 0
+    });
+    state.updateNoticeShown = true;
+  }
+
+  function loadUpdateStatus() {
+    if (!state.session || !state.session.canManageSystem) {
+      return $.Deferred().resolve().promise();
+    }
+
+    return $.get('/api/update-status').then(function (payload) {
+      state.currentVersion = (payload && payload.currentVersion) || state.currentVersion;
+      state.latestVersion = (payload && payload.latestVersion) || '';
+      state.updateAvailable = Boolean(payload && payload.updateAvailable);
+      maybeShowUpdateNotice();
+    }).catch(function () {
+      state.latestVersion = '';
+      state.updateAvailable = false;
+    });
+  }
+
   function updateDeleteLibraryProgressNote() {
     if ($deleteLibraryProgressCheckbox.prop('checked')) {
       $deleteLibraryProgressNote.text('Reading progress will be removed for everyone as part of this reset.');
@@ -274,9 +310,11 @@ $(document).ready(function () {
         state.themeColorOptions = themeColors;
       }
 
+      state.currentVersion = (payload && payload.currentVersion) || '';
       state.themeColorKey = (payload && payload.themeColor) || state.themeColorKey;
       populateThemeColorOptions();
       applyTheme();
+      maybeShowUpdateNotice();
     }).catch(function () {
       populateThemeColorOptions();
       applyTheme();
@@ -287,6 +325,8 @@ $(document).ready(function () {
     return $.get('/api/session').then(function (payload) {
       state.session = payload || {};
       renderSession();
+      loadUpdateStatus();
+      maybeShowUpdateNotice();
     });
   }
 

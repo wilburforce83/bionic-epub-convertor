@@ -28,6 +28,8 @@ const {
   removeReadingProgressForUserAndFilename
 } = require('./utils/libraryMaintenance');
 const { createUserStore, DEFAULT_BOOTSTRAP_USERNAME, DEFAULT_BOOTSTRAP_PASSWORD } = require('./utils/userStore');
+const { compareSemver, pickLatestSemver } = require('./utils/versionUtils');
+const packageMetadata = require('./package.json');
 
 const app = express();
 const rootDir = __dirname;
@@ -49,6 +51,23 @@ const MAX_EPUB_ARCHIVE_ENTRIES = Number(process.env.MAX_EPUB_ARCHIVE_ENTRIES || 
 const MAX_EPUB_EXTRACT_BYTES = Number(process.env.MAX_EPUB_EXTRACT_BYTES || 300 * 1024 * 1024);
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_MAX_ATTEMPTS = 20;
+const APP_VERSION = String(packageMetadata.version || '0.0.0').trim() || '0.0.0';
+const UPDATE_CHECK_CACHE_MS = Number.parseInt(process.env.UPDATE_CHECK_CACHE_MS || '', 10) > 0
+  ? Number.parseInt(process.env.UPDATE_CHECK_CACHE_MS, 10)
+  : 15 * 60 * 1000;
+const UPDATE_CHECK_TIMEOUT_MS = Number.parseInt(process.env.UPDATE_CHECK_TIMEOUT_MS || '', 10) > 0
+  ? Number.parseInt(process.env.UPDATE_CHECK_TIMEOUT_MS, 10)
+  : 3500;
+const UPDATE_CHECK_MAX_PAGES = Number.parseInt(process.env.UPDATE_CHECK_MAX_PAGES || '', 10) > 0
+  ? Number.parseInt(process.env.UPDATE_CHECK_MAX_PAGES, 10)
+  : 3;
+const UPDATE_CHECK_NAMESPACE = String(process.env.UPDATE_CHECK_DOCKER_NAMESPACE || 'wilburforce83').trim() || 'wilburforce83';
+const UPDATE_CHECK_REPOSITORY = String(process.env.UPDATE_CHECK_DOCKER_REPOSITORY || 'dyslibria').trim() || 'dyslibria';
+const updateCheckState = {
+  value: null,
+  checkedAt: 0,
+  pending: null
+};
 
 function parsePort(value, fallback, key) {
   const parsed = Number.parseInt(value, 10);
@@ -119,12 +138,89 @@ function getThemeColorSetting() {
 function getPublicAppConfig() {
   return {
     success: true,
+    currentVersion: APP_VERSION,
     defaultThemeMode: 'dark',
     themeColor: getThemeColorSetting(),
     themeColors: THEME_COLOR_OPTIONS,
     setupRequired: isSetupRequired(),
     bootstrapUsername: DEFAULT_BOOTSTRAP_USERNAME
   };
+}
+
+function getDefaultUpdatePayload() {
+  return {
+    currentVersion: APP_VERSION,
+    latestVersion: '',
+    updateAvailable: false
+  };
+}
+
+async function fetchLatestPublishedVersion() {
+  const tags = [];
+  let nextUrl = `https://hub.docker.com/v2/namespaces/${encodeURIComponent(UPDATE_CHECK_NAMESPACE)}/repositories/${encodeURIComponent(UPDATE_CHECK_REPOSITORY)}/tags?page_size=100`;
+  let pageCount = 0;
+
+  while (nextUrl && pageCount < UPDATE_CHECK_MAX_PAGES) {
+    const response = await fetch(nextUrl, {
+      headers: {
+        accept: 'application/json'
+      },
+      signal: AbortSignal.timeout(UPDATE_CHECK_TIMEOUT_MS)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Docker Hub responded with ${response.status}.`);
+    }
+
+    const payload = await response.json();
+    const pageTags = Array.isArray(payload && payload.results)
+      ? payload.results.map((result) => result && result.name).filter(Boolean)
+      : [];
+
+    tags.push(...pageTags);
+    nextUrl = typeof payload.next === 'string' ? payload.next : '';
+    pageCount += 1;
+  }
+
+  return pickLatestSemver(tags);
+}
+
+async function getAppUpdatePayload() {
+  const now = Date.now();
+  if (updateCheckState.value && now - updateCheckState.checkedAt < UPDATE_CHECK_CACHE_MS) {
+    return updateCheckState.value;
+  }
+
+  if (updateCheckState.pending) {
+    return updateCheckState.pending;
+  }
+
+  updateCheckState.pending = (async () => {
+    try {
+      const latestVersion = await fetchLatestPublishedVersion();
+      const payload = {
+        currentVersion: APP_VERSION,
+        latestVersion,
+        updateAvailable: Boolean(latestVersion) && compareSemver(latestVersion, APP_VERSION) > 0
+      };
+
+      updateCheckState.value = payload;
+      updateCheckState.checkedAt = Date.now();
+      return payload;
+    } catch (error) {
+      if (!updateCheckState.value) {
+        updateCheckState.value = getDefaultUpdatePayload();
+      }
+
+      updateCheckState.checkedAt = Date.now();
+      console.warn(`Unable to check for Dyslibria updates: ${error.message}`);
+      return updateCheckState.value;
+    } finally {
+      updateCheckState.pending = null;
+    }
+  })();
+
+  return updateCheckState.pending;
 }
 
 const uploadsDir = resolveDirectorySetting(
@@ -905,6 +1001,13 @@ app.get('/healthz', async (req, res) => {
 
 app.get('/api/app-config', (req, res) => {
   res.json(getPublicAppConfig());
+});
+
+app.get('/api/update-status', requireAdmin, async (req, res) => {
+  res.json({
+    success: true,
+    ...(await getAppUpdatePayload())
+  });
 });
 
 app.get('/api/session', isAuthenticated, (req, res) => {

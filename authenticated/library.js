@@ -49,7 +49,11 @@ $(document).ready(function () {
     libraryLoading: true,
     usingCachedLibrary: false,
     renderPassId: 0,
-    uploading: false
+    uploading: false,
+    currentVersion: '',
+    latestVersion: '',
+    updateAvailable: false,
+    updateNoticeShown: false
   };
 
   const $app = $('#libraryApp');
@@ -429,6 +433,38 @@ $(document).ready(function () {
 
   function applySessionCapabilities() {
     $adminTools.prop('hidden', !canDeleteBooks());
+  }
+
+  function maybeShowUpdateNotice() {
+    if (state.updateNoticeShown || !state.session || !state.session.canManageSystem || !state.updateAvailable) {
+      return;
+    }
+
+    if (!state.currentVersion || !state.latestVersion) {
+      return;
+    }
+
+    showNotice(`Version ${state.latestVersion} is available. You're running ${state.currentVersion}.`, 'info', {
+      title: 'Update available',
+      timeout: 0
+    });
+    state.updateNoticeShown = true;
+  }
+
+  function loadUpdateStatus() {
+    if (!state.session || !state.session.canManageSystem) {
+      return $.Deferred().resolve().promise();
+    }
+
+    return $.get('/api/update-status').then(function (payload) {
+      state.currentVersion = (payload && payload.currentVersion) || state.currentVersion;
+      state.latestVersion = (payload && payload.latestVersion) || '';
+      state.updateAvailable = Boolean(payload && payload.updateAvailable);
+      maybeShowUpdateNotice();
+    }).catch(function () {
+      state.latestVersion = '';
+      state.updateAvailable = false;
+    });
   }
 
   function closeCardMenus() {
@@ -845,6 +881,8 @@ $(document).ready(function () {
       if (state.books.length) {
         renderBooks();
       }
+      loadUpdateStatus();
+      maybeShowUpdateNotice();
     }).catch(function () {
       state.session = null;
       applySessionCapabilities();
@@ -887,8 +925,10 @@ $(document).ready(function () {
       state.themeColorOptions = themeColors.length
         ? themeColors
         : state.themeColorOptions;
+      state.currentVersion = (payload && payload.currentVersion) || '';
       state.themeColorKey = (payload && payload.themeColor) || state.themeColorKey;
       applyTheme();
+      maybeShowUpdateNotice();
     }).catch(function () {
       applyTheme();
     });
