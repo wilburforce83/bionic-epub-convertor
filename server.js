@@ -46,7 +46,7 @@ const tempDir = path.join(rootDir, 'temp');
 const incomingTempDir = path.join(tempDir, 'incoming');
 const failedDir = path.join(rootDir, 'failed');
 
-const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES || 100 * 1024 * 1024);
+const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES || 200 * 1024 * 1024);
 const MAX_EPUB_ARCHIVE_ENTRIES = Number(process.env.MAX_EPUB_ARCHIVE_ENTRIES || 5000);
 const MAX_EPUB_EXTRACT_BYTES = Number(process.env.MAX_EPUB_EXTRACT_BYTES || 300 * 1024 * 1024);
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
