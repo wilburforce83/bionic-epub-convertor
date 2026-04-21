@@ -189,6 +189,58 @@
         </div>
       </section>
 
+      <section class="browse-shell" id="browseShell" aria-label="Library browsing controls">
+        <div class="browse-primary">
+          <div class="view-switch" role="tablist" aria-label="Library view">
+            <button class="browse-toggle is-active" id="viewShelvesButton" type="button" data-view-mode="shelves"
+              role="tab" aria-selected="true">
+              Shelves
+            </button>
+            <button class="browse-toggle" id="viewGridButton" type="button" data-view-mode="grid" role="tab"
+              aria-selected="false">
+              Grid
+            </button>
+            <button class="browse-toggle" id="viewCompactButton" type="button" data-view-mode="compact" role="tab"
+              aria-selected="false">
+              Compact
+            </button>
+          </div>
+
+          <label class="sort-shell" for="sortSelect">
+            <span class="sort-label">Sort</span>
+            <select id="sortSelect">
+              <option value="recently-added">Recently added</option>
+              <option value="title-asc">Title A-Z</option>
+              <option value="author-asc">Author A-Z</option>
+              <option value="last-opened">Last opened</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="browse-secondary">
+          <div class="filter-chip-row" role="toolbar" aria-label="Quick library filters">
+            <button class="filter-chip is-active" type="button" data-filter="all" aria-pressed="true">All books</button>
+            <button class="filter-chip" type="button" data-filter="in-progress" aria-pressed="false">In progress</button>
+            <button class="filter-chip" type="button" data-filter="unread" aria-pressed="false">Unread</button>
+            <button class="filter-chip" type="button" data-filter="recently-added" aria-pressed="false">Recently added</button>
+            <button class="filter-chip" type="button" data-filter="recently-opened" aria-pressed="false">Recently opened</button>
+          </div>
+
+          <button class="ui button app-button ghost browse-clear hidden" id="clearBrowseButton" type="button" hidden>
+            Clear view
+          </button>
+        </div>
+
+        <div class="browse-summary">
+          <div>
+            <strong class="browse-summary-title" id="browseSummaryTitle">Browse the library</strong>
+            <p class="browse-summary-copy" id="browseSummaryCopy">Use shelves for relaxed browsing or switch to grid and compact views when you want to scan faster.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="shelf-stack" id="shelfStack" aria-live="polite" hidden></section>
+
       <section class="library-grid" id="epubCards" aria-live="polite"></section>
 
       <section class="empty-state" id="emptyState" hidden>

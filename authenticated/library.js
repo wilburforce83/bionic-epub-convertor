@@ -2,10 +2,17 @@ $(document).ready(function () {
   const THEME_STORAGE_KEY = 'dyslibria:library-theme:v1';
   const BANNER_STORAGE_KEY = 'dyslibria:library-banner-collapsed:v1';
   const LIBRARY_CACHE_KEY = 'dyslibria:library-cache:v1';
+  const LIBRARY_VIEW_STORAGE_KEY = 'dyslibria:library-view:v1';
+  const LIBRARY_SORT_STORAGE_KEY = 'dyslibria:library-sort:v1';
+  const LIBRARY_FILTER_STORAGE_KEY = 'dyslibria:library-filter:v1';
   const LIBRARY_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
   const LIBRARY_RENDER_BATCH_SIZE = 24;
   const UPLOAD_BATCH_MAX_BYTES = 32 * 1024 * 1024;
   const UPLOAD_BATCH_MAX_FILES = 12;
+  const DEFAULT_VIEW_MODE = 'shelves';
+  const DEFAULT_SORT_MODE = 'recently-added';
+  const DEFAULT_FILTER_MODE = 'all';
+  const RECENTLY_ADDED_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
   const TIPS = [
     {
       title: 'Reader zones',
@@ -32,6 +39,7 @@ $(document).ready(function () {
   const state = {
     books: [],
     query: '',
+    progressEntries: [],
     latestProgress: null,
     session: null,
     theme: localStorage.getItem(THEME_STORAGE_KEY) || 'dark',
@@ -55,7 +63,11 @@ $(document).ready(function () {
     currentVersion: '',
     latestVersion: '',
     updateAvailable: false,
-    updateNoticeShown: false
+    updateNoticeShown: false,
+    viewMode: localStorage.getItem(LIBRARY_VIEW_STORAGE_KEY) || DEFAULT_VIEW_MODE,
+    sortMode: localStorage.getItem(LIBRARY_SORT_STORAGE_KEY) || DEFAULT_SORT_MODE,
+    activeFilter: localStorage.getItem(LIBRARY_FILTER_STORAGE_KEY) || DEFAULT_FILTER_MODE,
+    selectedCollection: null
   };
 
   const $app = $('#libraryApp');
@@ -74,6 +86,12 @@ $(document).ready(function () {
   const $libraryLoading = $('#libraryLoading');
   const $libraryLoadingTitle = $('#libraryLoadingTitle');
   const $libraryLoadingText = $('#libraryLoadingText');
+  const $browseShell = $('#browseShell');
+  const $shelfStack = $('#shelfStack');
+  const $browseSummaryTitle = $('#browseSummaryTitle');
+  const $browseSummaryCopy = $('#browseSummaryCopy');
+  const $clearBrowseButton = $('#clearBrowseButton');
+  const $sortSelect = $('#sortSelect');
   const $searchBar = $('#searchBar');
   const $dropZone = $('#dropZone');
   const $fileInput = $('#epubFiles');
@@ -115,6 +133,12 @@ $(document).ready(function () {
   const $bookActionConfirmCopy = $('#bookActionConfirmCopy');
   const $bookActionConfirmNote = $('#bookActionConfirmNote');
   const $confirmBookActionButton = $('#confirmBookActionButton');
+  const $viewToggles = $('.browse-toggle');
+  const $filterChips = $('.filter-chip');
+
+  state.viewMode = sanitizeViewMode(state.viewMode);
+  state.sortMode = sanitizeSortMode(state.sortMode);
+  state.activeFilter = sanitizeFilterMode(state.activeFilter);
 
   function clearNotice() {
     if (state.noticeTimer) {
@@ -198,6 +222,366 @@ $(document).ready(function () {
 
     const precision = currentValue >= 10 || unitIndex === 0 ? 0 : 1;
     return `${currentValue.toFixed(precision)} ${units[unitIndex]}`;
+  }
+
+  function sanitizeViewMode(value) {
+    const normalizedValue = String(value || '').trim().toLowerCase();
+    return ['shelves', 'grid', 'compact'].includes(normalizedValue)
+      ? normalizedValue
+      : DEFAULT_VIEW_MODE;
+  }
+
+  function sanitizeSortMode(value) {
+    const normalizedValue = String(value || '').trim().toLowerCase();
+    return ['recently-added', 'title-asc', 'author-asc', 'last-opened'].includes(normalizedValue)
+      ? normalizedValue
+      : DEFAULT_SORT_MODE;
+  }
+
+  function sanitizeFilterMode(value) {
+    const normalizedValue = String(value || '').trim().toLowerCase();
+    return ['all', 'in-progress', 'unread', 'recently-added', 'recently-opened'].includes(normalizedValue)
+      ? normalizedValue
+      : DEFAULT_FILTER_MODE;
+  }
+
+  function persistBrowsePreferences() {
+    localStorage.setItem(LIBRARY_VIEW_STORAGE_KEY, state.viewMode);
+    localStorage.setItem(LIBRARY_SORT_STORAGE_KEY, state.sortMode);
+    localStorage.setItem(LIBRARY_FILTER_STORAGE_KEY, state.activeFilter);
+  }
+
+  function normalizeTimestamp(value) {
+    const timestamp = Date.parse(value || '');
+    return Number.isFinite(timestamp) ? timestamp : 0;
+  }
+
+  function countBooksLabel(count) {
+    return `${count} book${count === 1 ? '' : 's'}`;
+  }
+
+  function getFilterLabel(filterKey) {
+    switch (filterKey) {
+      case 'in-progress':
+        return 'In progress';
+      case 'unread':
+        return 'Unread';
+      case 'recently-added':
+        return 'Recently added';
+      case 'recently-opened':
+        return 'Recently opened';
+      default:
+        return 'All books';
+    }
+  }
+
+  function normalizeProgressEntry(entry) {
+    const source = entry && typeof entry === 'object' ? entry : {};
+    return {
+      ...source,
+      filename: String(source.filename || ''),
+      progressPercent: Math.max(0, Math.min(100, Number(source.progressPercent) || 0)),
+      updatedAtMs: normalizeTimestamp(source.updatedAt)
+    };
+  }
+
+  function getProgressByFilename() {
+    const progressByFilename = new Map();
+
+    state.progressEntries.forEach(function (entry) {
+      if (!entry.filename) {
+        return;
+      }
+
+      const existingEntry = progressByFilename.get(entry.filename);
+      if (!existingEntry || entry.updatedAtMs > existingEntry.updatedAtMs) {
+        progressByFilename.set(entry.filename, entry);
+      }
+    });
+
+    return progressByFilename;
+  }
+
+  function getDecoratedBooks() {
+    const progressByFilename = getProgressByFilename();
+    const authorCounts = state.books.reduce(function (counts, book) {
+      const authorKey = String(book.author || 'Unknown author').trim().toLowerCase();
+      counts.set(authorKey, (counts.get(authorKey) || 0) + 1);
+      return counts;
+    }, new Map());
+    const recentlyAddedCutoff = Date.now() - RECENTLY_ADDED_WINDOW_MS;
+
+    return state.books.map(function (book) {
+      const progress = progressByFilename.get(book.filename) || null;
+      const displayTitle = book.title || book.filename || 'Untitled';
+      const displayAuthor = book.author || 'Unknown author';
+      const authorKey = String(displayAuthor).trim().toLowerCase();
+      const lastModifiedAt = normalizeTimestamp(book.lastModified);
+      const hasProgress = Boolean(progress && (
+        progress.location ||
+        progress.updatedAtMs ||
+        progress.progressPercent > 0 ||
+        progress.chapterLabel ||
+        progress.pageLabel
+      ));
+
+      return {
+        ...book,
+        displayTitle,
+        displayAuthor,
+        searchText: `${displayTitle} ${displayAuthor} ${book.filename || ''}`.toLowerCase(),
+        lastModifiedAt,
+        progress,
+        progressUpdatedAtMs: progress ? progress.updatedAtMs : 0,
+        hasProgress,
+        isInProgress: hasProgress && progress && progress.progressPercent > 0 && progress.progressPercent < 100,
+        isUnread: !hasProgress,
+        isRecentlyAdded: Boolean(lastModifiedAt && lastModifiedAt >= recentlyAddedCutoff),
+        isRecentlyOpened: Boolean(progress && progress.updatedAtMs),
+        authorBookCount: authorCounts.get(authorKey) || 0
+      };
+    });
+  }
+
+  function getActiveCollectionFilenameSet() {
+    if (!state.selectedCollection || !Array.isArray(state.selectedCollection.filenames)) {
+      return null;
+    }
+
+    return new Set(state.selectedCollection.filenames);
+  }
+
+  function getVisibleBooks() {
+    const query = String(state.query || '').trim().toLowerCase();
+    const activeCollectionSet = getActiveCollectionFilenameSet();
+    const books = getDecoratedBooks().filter(function (book) {
+      if (activeCollectionSet && !activeCollectionSet.has(book.filename)) {
+        return false;
+      }
+
+      if (state.activeFilter === 'in-progress' && !book.isInProgress) {
+        return false;
+      }
+
+      if (state.activeFilter === 'unread' && !book.isUnread) {
+        return false;
+      }
+
+      if (state.activeFilter === 'recently-added' && !book.isRecentlyAdded) {
+        return false;
+      }
+
+      if (state.activeFilter === 'recently-opened' && !book.isRecentlyOpened) {
+        return false;
+      }
+
+      if (query && !book.searchText.includes(query)) {
+        return false;
+      }
+
+      return true;
+    });
+
+    return books.sort(function (left, right) {
+      if (state.sortMode === 'title-asc') {
+        return left.displayTitle.localeCompare(right.displayTitle, undefined, { sensitivity: 'base' }) ||
+          left.displayAuthor.localeCompare(right.displayAuthor, undefined, { sensitivity: 'base' });
+      }
+
+      if (state.sortMode === 'author-asc') {
+        return left.displayAuthor.localeCompare(right.displayAuthor, undefined, { sensitivity: 'base' }) ||
+          left.displayTitle.localeCompare(right.displayTitle, undefined, { sensitivity: 'base' });
+      }
+
+      if (state.sortMode === 'last-opened') {
+        return (right.progressUpdatedAtMs - left.progressUpdatedAtMs) ||
+          (right.lastModifiedAt - left.lastModifiedAt) ||
+          left.displayTitle.localeCompare(right.displayTitle, undefined, { sensitivity: 'base' });
+      }
+
+      return (right.lastModifiedAt - left.lastModifiedAt) ||
+        (right.progressUpdatedAtMs - left.progressUpdatedAtMs) ||
+        left.displayTitle.localeCompare(right.displayTitle, undefined, { sensitivity: 'base' });
+    });
+  }
+
+  function buildShelfCollection(key, caption, title, meta, books) {
+    return {
+      key,
+      caption,
+      title,
+      meta,
+      books: books.slice(0, 12),
+      allBooks: books.slice()
+    };
+  }
+
+  function buildShelfCollections(books) {
+    if (!books.length) {
+      return [];
+    }
+
+    if (state.selectedCollection) {
+      return [
+        buildShelfCollection(
+          state.selectedCollection.key || 'selected',
+          'Focused shelf',
+          state.selectedCollection.title || 'Selected books',
+          `${countBooksLabel(books.length)} in this saved browse slice.`,
+          books
+        )
+      ];
+    }
+
+    const collections = [];
+    const inProgressBooks = books
+      .filter(function (book) { return book.isInProgress; })
+      .sort(function (left, right) { return right.progressUpdatedAtMs - left.progressUpdatedAtMs; });
+    const recentlyOpenedBooks = books
+      .filter(function (book) { return book.isRecentlyOpened; })
+      .sort(function (left, right) { return right.progressUpdatedAtMs - left.progressUpdatedAtMs; });
+    const recentlyAddedBooks = books
+      .slice()
+      .sort(function (left, right) { return right.lastModifiedAt - left.lastModifiedAt; });
+    const unreadBooks = books.filter(function (book) { return book.isUnread; });
+    const authorGroups = books.reduce(function (groups, book) {
+      const authorKey = String(book.displayAuthor || 'Unknown author').trim().toLowerCase();
+      if (!groups.has(authorKey)) {
+        groups.set(authorKey, {
+          author: book.displayAuthor,
+          books: []
+        });
+      }
+      groups.get(authorKey).books.push(book);
+      return groups;
+    }, new Map());
+
+    if (inProgressBooks.length) {
+      collections.push(buildShelfCollection(
+        'continue-reading',
+        'Resume',
+        'Continue reading',
+        `${countBooksLabel(inProgressBooks.length)} with a saved place to jump back into.`,
+        inProgressBooks
+      ));
+    }
+
+    if (recentlyAddedBooks.length) {
+      collections.push(buildShelfCollection(
+        'recently-added',
+        'Fresh on the shelf',
+        'Recently added',
+        `${countBooksLabel(recentlyAddedBooks.length)} added or refreshed recently.`,
+        recentlyAddedBooks
+      ));
+    }
+
+    if (unreadBooks.length) {
+      collections.push(buildShelfCollection(
+        'unread',
+        'Ready to start',
+        'Unread picks',
+        `${countBooksLabel(unreadBooks.length)} waiting for a first reading session.`,
+        unreadBooks
+      ));
+    }
+
+    if (recentlyOpenedBooks.length) {
+      collections.push(buildShelfCollection(
+        'recently-opened',
+        'Recent activity',
+        'Recently opened',
+        `${countBooksLabel(recentlyOpenedBooks.length)} with saved reading history.`,
+        recentlyOpenedBooks
+      ));
+    }
+
+    Array.from(authorGroups.values())
+      .filter(function (group) {
+        return group.books.length > 1;
+      })
+      .sort(function (left, right) {
+        return (right.books.length - left.books.length) ||
+          left.author.localeCompare(right.author, undefined, { sensitivity: 'base' });
+      })
+      .slice(0, 3)
+      .forEach(function (group) {
+        const authorBooks = group.books.slice().sort(function (left, right) {
+          return right.lastModifiedAt - left.lastModifiedAt;
+        });
+
+        collections.push(buildShelfCollection(
+          `author-${group.author.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+          'Author spotlight',
+          `More from ${group.author}`,
+          `${countBooksLabel(authorBooks.length)} by the same author for deeper browsing.`,
+          authorBooks
+        ));
+      });
+
+    if (!collections.length) {
+      collections.push(buildShelfCollection(
+        'matching-books',
+        'Library view',
+        'Matching books',
+        `${countBooksLabel(books.length)} in the current library view.`,
+        books
+      ));
+    }
+
+    return collections;
+  }
+
+  function shouldShowClearBrowse() {
+    return Boolean(
+      String(state.query || '').trim() ||
+      state.activeFilter !== DEFAULT_FILTER_MODE ||
+      state.selectedCollection
+    );
+  }
+
+  function renderBrowseControls(visibleBooks) {
+    const visibleCount = Array.isArray(visibleBooks) ? visibleBooks.length : 0;
+    let summaryTitle = 'Browse the library';
+    let summaryCopy = 'Use shelves for relaxed browsing or switch to grid and compact views when you want to scan faster.';
+
+    $viewToggles.each(function () {
+      const $button = $(this);
+      const isActive = String($button.data('viewMode') || '') === state.viewMode;
+      $button.toggleClass('is-active', isActive).attr('aria-selected', String(isActive));
+    });
+
+    $filterChips.each(function () {
+      const $button = $(this);
+      const isActive = String($button.data('filter') || '') === state.activeFilter;
+      $button.toggleClass('is-active', isActive).attr('aria-pressed', String(isActive));
+    });
+
+    $sortSelect.val(state.sortMode);
+
+    if (state.selectedCollection) {
+      summaryTitle = state.selectedCollection.title || 'Focused shelf';
+      summaryCopy = `${countBooksLabel(visibleCount)} from this shelf. Search, sort, and filters are still applied on top.`;
+    } else if (String(state.query || '').trim()) {
+      summaryTitle = 'Search results';
+      summaryCopy = `${countBooksLabel(visibleCount)} matching “${state.query.trim()}”.`;
+    } else if (state.activeFilter !== DEFAULT_FILTER_MODE) {
+      summaryTitle = getFilterLabel(state.activeFilter);
+      summaryCopy = `${countBooksLabel(visibleCount)} in the current filtered view.`;
+    } else if (state.viewMode === 'grid') {
+      summaryTitle = 'Grid view';
+      summaryCopy = 'A full-shelf scan with cover-first cards and quick actions on every book.';
+    } else if (state.viewMode === 'compact') {
+      summaryTitle = 'Compact view';
+      summaryCopy = 'Denser rows with more metadata, useful when you want to compare titles quickly.';
+    }
+
+    $browseSummaryTitle.text(summaryTitle);
+    $browseSummaryCopy.text(summaryCopy);
+    $clearBrowseButton
+      .prop('hidden', !shouldShowClearBrowse())
+      .toggleClass('hidden', !shouldShowClearBrowse())
+      .text(state.selectedCollection ? 'Back to full library' : 'Clear view');
   }
 
   function getSelectedUploadFiles() {
@@ -736,8 +1120,8 @@ $(document).ready(function () {
   }
 
   function closeCardMenus() {
-    $cards.find('.card-menu').prop('hidden', true);
-    $cards.find('.card-menu-toggle').attr('aria-expanded', 'false');
+    $app.find('.card-menu').prop('hidden', true);
+    $app.find('.card-menu-toggle').attr('aria-expanded', 'false');
   }
 
   function setConfirmButtonStyle(label, isDanger) {
@@ -775,7 +1159,7 @@ $(document).ready(function () {
 
   function updateCountLabel(visibleCount, totalCount) {
     const suffix = visibleCount === 1 ? 'book' : 'books';
-    const prefix = state.query && visibleCount !== totalCount
+    const prefix = (shouldShowClearBrowse() && visibleCount !== totalCount)
       ? `${visibleCount} of ${totalCount}`
       : `${visibleCount}`;
 
@@ -783,22 +1167,47 @@ $(document).ready(function () {
     $libraryMeta.text(getLibraryMetaCopy(visibleCount, totalCount));
   }
 
-  function getFilteredBooks() {
-    const query = state.query.trim().toLowerCase();
-    if (!query) {
-      return state.books.slice();
+  function buildCardStatus(book) {
+    if (book.isInProgress && book.progress) {
+      return {
+        label: `${book.progress.progressPercent || 0}% read`,
+        neutral: false,
+        progressCopy: book.progress.pageLabel || book.progress.chapterLabel || `Last opened ${formatRelativeTime(book.progress.updatedAt)}`
+      };
     }
 
-    return state.books.filter(function (book) {
-      const title = String(book.title || '').toLowerCase();
-      const author = String(book.author || '').toLowerCase();
-      return title.includes(query) || author.includes(query);
-    });
+    if (book.isRecentlyOpened && book.progress) {
+      return {
+        label: `Opened ${formatRelativeTime(book.progress.updatedAt)}`,
+        neutral: false
+      };
+    }
+
+    if (book.isRecentlyAdded) {
+      return {
+        label: `Added ${formatRelativeTime(book.lastModified)}`,
+        neutral: false
+      };
+    }
+
+    if (book.authorBookCount > 1) {
+      return {
+        label: `${book.authorBookCount} by this author`,
+        neutral: false
+      };
+    }
+
+    return {
+      label: 'Ready to read',
+      neutral: true
+    };
   }
 
-  function createCard(book) {
+  function createCard(book, options) {
+    const variant = options && options.variant ? options.variant : 'standard';
     const filename = book.filename || '';
-    const titleText = book.title || filename || 'Untitled';
+    const titleText = book.displayTitle || book.title || filename || 'Untitled';
+    const cardStatus = buildCardStatus(book);
     const $card = $('<article>').addClass('library-card').attr('data-filename', filename);
     const $coverSurface = $('<div>').addClass('cover-surface');
     const $menuShell = $('<div>').addClass('card-menu-shell');
@@ -821,13 +1230,17 @@ $(document).ready(function () {
       });
     const $body = $('<div>').addClass('card-body');
     const $title = $('<h2>').addClass('card-title').text(titleText);
-    const $author = $('<p>').addClass('card-author').text(book.author || 'Unknown author');
+    const $author = $('<p>').addClass('card-author').text(book.displayAuthor || book.author || 'Unknown author');
+    const $metaStack = $('<div>').addClass('card-meta-stack');
     const $footer = $('<div>').addClass('card-footer');
     const $readLink = $('<a>')
       .addClass('card-chip card-read-link')
       .attr({
-        href: `reader.html?file=${encodeURIComponent(filename)}`,
-        'aria-label': `Read ${titleText}`
+        href: buildReaderUrl({
+          filename,
+          location: book.progress && book.progress.location
+        }),
+        'aria-label': `${book.hasProgress ? 'Resume' : 'Read'} ${titleText}`
       });
     const $resetAction = $('<button>')
       .addClass('card-menu-action')
@@ -840,7 +1253,7 @@ $(document).ready(function () {
       .text('Reset reading state');
 
     $readLink.append($('<i>').addClass('book icon').attr('aria-hidden', 'true'));
-    $readLink.append($('<span>').text('Read now'));
+    $readLink.append($('<span>').text(book.hasProgress ? 'Resume' : 'Read now'));
 
     $image.on('error', function () {
       $coverSurface.addClass('is-fallback');
@@ -863,34 +1276,122 @@ $(document).ready(function () {
       );
     }
 
+    if (variant === 'shelf') {
+      $card.addClass('is-shelf');
+    }
+
+    if (variant === 'compact') {
+      $card.addClass('is-compact');
+    }
+
+    $metaStack.append(
+      $('<span>')
+        .addClass(`card-status-chip${cardStatus.neutral ? ' is-neutral' : ''}`)
+        .text(cardStatus.label)
+    );
+
+    if (book.isInProgress && book.progress) {
+      $metaStack.append(
+        $('<div>').addClass('card-progress')
+          .append(
+            $('<div>').addClass('card-progress-track').append(
+              $('<div>')
+                .addClass('card-progress-fill')
+                .css('width', `${book.progress.progressPercent || 0}%`)
+            )
+          )
+          .append(
+            $('<span>')
+              .addClass('card-progress-copy')
+              .text(cardStatus.progressCopy || 'Saved reading progress is available.')
+          )
+      );
+    }
+
     $menuShell.append($menuToggle, $menu);
     $coverSurface.append($image, $menuShell);
     $footer.append($readLink);
-    $body.append($title, $author, $footer);
+    $body.append($title, $author, $metaStack, $footer);
     $card.append($coverSurface, $body);
 
     return $card;
   }
 
-  function renderBooks() {
-    const filteredBooks = getFilteredBooks();
-    const renderPassId = state.renderPassId + 1;
+  function createShelfRow(collection) {
+    const trackId = `shelfTrack-${collection.key}`;
+    const navDisabled = collection.books.length <= 1;
+    const $row = $('<section>').addClass('shelf-row').attr('data-collection-key', collection.key);
+    const $header = $('<div>').addClass('shelf-head');
+    const $copy = $('<div>').append(
+      $('<span>').addClass('shelf-caption').text(collection.caption || 'Shelf'),
+      $('<h2>').addClass('shelf-title').text(collection.title),
+      $('<p>').addClass('shelf-meta').text(collection.meta)
+    );
+    const $actions = $('<div>').addClass('shelf-actions');
+    const $track = $('<div>')
+      .addClass('shelf-track')
+      .attr({
+        id: trackId,
+        tabindex: '0'
+      });
+
+    const $seeAll = $('<button>')
+      .addClass('shelf-action')
+      .attr({
+        type: 'button',
+        'data-action': 'see-all'
+      })
+      .text('See all')
+      .data('collection', {
+        key: collection.key,
+        title: collection.title,
+        filenames: collection.allBooks.map(function (book) {
+          return book.filename;
+        })
+      });
+    const $previous = $('<button>')
+      .addClass('shelf-nav')
+      .attr({
+        type: 'button',
+        'data-target': trackId,
+        'data-direction': 'previous',
+        'aria-label': `Scroll ${collection.title} left`
+      })
+      .prop('disabled', navDisabled)
+      .html('<i class="angle left icon" aria-hidden="true"></i>');
+    const $next = $('<button>')
+      .addClass('shelf-nav')
+      .attr({
+        type: 'button',
+        'data-target': trackId,
+        'data-direction': 'next',
+        'aria-label': `Scroll ${collection.title} right`
+      })
+      .prop('disabled', navDisabled)
+      .html('<i class="angle right icon" aria-hidden="true"></i>');
+
+    collection.books.forEach(function (book) {
+      $track.append(createCard(book, { variant: 'shelf' }));
+    });
+
+    $actions.append($seeAll, $previous, $next);
+    $header.append($copy, $actions);
+    $row.append($header, $('<div>').addClass('shelf-scroller').append($track));
+    return $row;
+  }
+
+  function renderShelfCollections(collections) {
+    const fragment = document.createDocumentFragment();
+    collections.forEach(function (collection) {
+      fragment.appendChild(createShelfRow(collection).get(0));
+    });
+    $shelfStack.empty().append(fragment);
+  }
+
+  function renderGridBooks(books, renderPassId) {
     const deferred = $.Deferred();
-
-    state.renderPassId = renderPassId;
-    closeCardMenus();
-    $cards.empty();
-    $emptyState.prop('hidden', true);
-
-    updateCountLabel(filteredBooks.length, state.books.length);
-
-    if (!filteredBooks.length) {
-      $emptyState.prop('hidden', state.libraryLoading);
-      deferred.resolve();
-      return deferred.promise();
-    }
-
     const gridElement = $cards.get(0);
+    const variant = state.viewMode === 'compact' ? 'compact' : 'standard';
     let index = 0;
 
     function appendChunk() {
@@ -900,15 +1401,15 @@ $(document).ready(function () {
       }
 
       const fragment = document.createDocumentFragment();
-      const chunkLimit = Math.min(index + LIBRARY_RENDER_BATCH_SIZE, filteredBooks.length);
+      const chunkLimit = Math.min(index + LIBRARY_RENDER_BATCH_SIZE, books.length);
 
       for (; index < chunkLimit; index += 1) {
-        fragment.appendChild(createCard(filteredBooks[index]).get(0));
+        fragment.appendChild(createCard(books[index], { variant }).get(0));
       }
 
       gridElement.appendChild(fragment);
 
-      if (index < filteredBooks.length) {
+      if (index < books.length) {
         window.requestAnimationFrame(appendChunk);
         return;
       }
@@ -918,6 +1419,40 @@ $(document).ready(function () {
 
     appendChunk();
     return deferred.promise();
+  }
+
+  function renderBooks() {
+    const visibleBooks = getVisibleBooks();
+    const renderPassId = state.renderPassId + 1;
+    const deferred = $.Deferred();
+
+    state.renderPassId = renderPassId;
+    closeCardMenus();
+    $cards.empty();
+    $cards.toggleClass('is-compact', state.viewMode === 'compact');
+    $cards.prop('hidden', state.viewMode === 'shelves');
+    $shelfStack.empty();
+    $shelfStack.prop('hidden', state.viewMode !== 'shelves');
+    $emptyState.prop('hidden', true);
+
+    renderBrowseControls(visibleBooks);
+    updateCountLabel(visibleBooks.length, state.books.length);
+
+    if (!visibleBooks.length) {
+      $cards.prop('hidden', true);
+      $shelfStack.prop('hidden', true);
+      $emptyState.prop('hidden', state.libraryLoading);
+      deferred.resolve();
+      return deferred.promise();
+    }
+
+    if (state.viewMode === 'shelves') {
+      renderShelfCollections(buildShelfCollections(visibleBooks));
+      deferred.resolve();
+      return deferred.promise();
+    }
+
+    return renderGridBooks(visibleBooks, renderPassId);
   }
 
   function renderTip() {
@@ -1065,6 +1600,64 @@ $(document).ready(function () {
     $menuToggle.attr('aria-expanded', 'false');
   }
 
+  function focusBrowseShell() {
+    const browseElement = $browseShell.get(0);
+    if (!browseElement || typeof browseElement.scrollIntoView !== 'function') {
+      return;
+    }
+
+    browseElement.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start'
+    });
+  }
+
+  function activateCollectionBrowse(collection) {
+    if (!collection || !Array.isArray(collection.filenames) || !collection.filenames.length) {
+      return;
+    }
+
+    state.selectedCollection = {
+      key: collection.key || 'selected',
+      title: collection.title || 'Selected books',
+      filenames: collection.filenames.slice(),
+      returnViewMode: state.viewMode
+    };
+    state.viewMode = 'grid';
+    persistBrowsePreferences();
+    closeMobileMenu();
+    renderBooks();
+    focusBrowseShell();
+  }
+
+  function clearBrowseState() {
+    const returnViewMode = state.selectedCollection && state.selectedCollection.returnViewMode;
+    state.selectedCollection = null;
+    state.activeFilter = DEFAULT_FILTER_MODE;
+    state.query = '';
+    $searchBar.val('');
+
+    if (returnViewMode) {
+      state.viewMode = sanitizeViewMode(returnViewMode);
+    }
+
+    persistBrowsePreferences();
+    renderBooks();
+  }
+
+  function scrollShelfTrack(targetId, direction) {
+    const trackElement = document.getElementById(targetId);
+    if (!trackElement) {
+      return;
+    }
+
+    const distance = Math.max(260, trackElement.clientWidth * 0.82);
+    trackElement.scrollBy({
+      left: direction === 'previous' ? -distance : distance,
+      behavior: 'smooth'
+    });
+  }
+
   function hydrateLibraryFromCache() {
     const cachedBooks = readLibrarySnapshot();
     if (!cachedBooks.length) {
@@ -1110,7 +1703,7 @@ $(document).ready(function () {
 
       return renderBooks().always(function () {
         setLibraryLoadingState(false);
-        if (!getFilteredBooks().length) {
+        if (!getVisibleBooks().length) {
           renderBooks();
         }
       });
@@ -1126,7 +1719,8 @@ $(document).ready(function () {
         return $.Deferred().reject(xhr).promise();
       }
 
-      updateCountLabel(getFilteredBooks().length, state.books.length);
+      updateCountLabel(getVisibleBooks().length, state.books.length);
+      renderBrowseControls(getVisibleBooks());
       return $.Deferred().reject(xhr).promise();
     });
   }
@@ -1134,11 +1728,21 @@ $(document).ready(function () {
   function loadReadingProgress() {
     return $.get('/api/reading-progress').then(function (payload) {
       const progressEntries = Array.isArray(payload && payload.progress) ? payload.progress : [];
-      state.latestProgress = progressEntries[0] || null;
+      state.progressEntries = progressEntries.map(normalizeProgressEntry).filter(function (entry) {
+        return Boolean(entry.filename);
+      });
+      state.latestProgress = state.progressEntries[0] || null;
       renderContinueCard();
+      if (state.books.length) {
+        renderBooks();
+      }
     }).catch(function () {
+      state.progressEntries = [];
       state.latestProgress = null;
       renderContinueCard();
+      if (state.books.length) {
+        renderBooks();
+      }
     });
   }
 
@@ -1355,7 +1959,46 @@ $(document).ready(function () {
       syncSelectedFilesUi();
     });
 
-    $cards.on('click', '.card-menu-toggle', function (event) {
+    $viewToggles.on('click', function () {
+      state.viewMode = sanitizeViewMode($(this).data('viewMode'));
+      persistBrowsePreferences();
+      closeMobileMenu();
+      renderBooks();
+    });
+
+    $sortSelect.on('change', function () {
+      state.sortMode = sanitizeSortMode($(this).val());
+      persistBrowsePreferences();
+      renderBooks();
+    });
+
+    $filterChips.on('click', function () {
+      state.activeFilter = sanitizeFilterMode($(this).data('filter'));
+      state.selectedCollection = null;
+      persistBrowsePreferences();
+      renderBooks();
+      focusBrowseShell();
+    });
+
+    $clearBrowseButton.on('click', function () {
+      clearBrowseState();
+      focusBrowseShell();
+    });
+
+    $app.on('click', '.shelf-action[data-action="see-all"]', function () {
+      activateCollectionBrowse($(this).data('collection'));
+    });
+
+    $app.on('click', '.shelf-nav', function () {
+      const $button = $(this);
+      if ($button.prop('disabled')) {
+        return;
+      }
+
+      scrollShelfTrack(String($button.data('target') || ''), String($button.data('direction') || 'next'));
+    });
+
+    $app.on('click', '.card-menu-toggle', function (event) {
       event.preventDefault();
       event.stopPropagation();
 
@@ -1370,11 +2013,11 @@ $(document).ready(function () {
       }
     });
 
-    $cards.on('click', '.card-menu', function (event) {
+    $app.on('click', '.card-menu', function (event) {
       event.stopPropagation();
     });
 
-    $cards.on('click', '.card-menu-action', function (event) {
+    $app.on('click', '.card-menu-action', function (event) {
       event.preventDefault();
       event.stopPropagation();
 
