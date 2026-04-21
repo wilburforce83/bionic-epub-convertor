@@ -24,12 +24,19 @@ $(document).ready(function () {
   const $profileStatus = $('#profileStatus');
   const $generalSection = $('#generalSection');
   const $usersSection = $('#usersSection');
+  const $dangerSection = $('#dangerSection');
   const $themeColorSelect = $('#themeColorSelect');
   const $userList = $('#userList');
   const $backToLibraryButton = $('#backToLibraryButton');
   const $settingsInstallButton = $('#settingsInstallButton');
   const $settingsMenuToggle = $('#settingsMenuToggle');
   const $settingsHeaderActions = $('#settingsHeaderActions');
+  const $deleteLibraryProgressCheckbox = $('#deleteLibraryProgressCheckbox');
+  const $deleteLibraryProgressNote = $('#deleteLibraryProgressNote');
+  const $deleteLibraryConfirmModal = $('#deleteLibraryConfirmModal');
+  const $deleteLibraryConfirmCopy = $('#deleteLibraryConfirmCopy');
+  const $deleteLibraryConfirmNote = $('#deleteLibraryConfirmNote');
+  const $confirmDeleteLibraryButton = $('#confirmDeleteLibraryButton');
 
   if (window.DyslibriaPwa) {
     window.DyslibriaPwa.bindInstallButton($settingsInstallButton.get(0));
@@ -138,6 +145,18 @@ $(document).ready(function () {
     $settingsIntroCopy.text('Manage system defaults, account access, and install behaviour from one place.');
     $generalSection.prop('hidden', user.role !== 'admin');
     $usersSection.prop('hidden', user.role !== 'admin');
+    $dangerSection.prop('hidden', user.role !== 'admin');
+  }
+
+  function updateDeleteLibraryProgressNote() {
+    if ($deleteLibraryProgressCheckbox.prop('checked')) {
+      $deleteLibraryProgressNote.text('Reading progress will be removed for everyone as part of this reset.');
+      return;
+    }
+
+    $deleteLibraryProgressNote.text(
+      'If you leave this unticked, saved reading progress stays on the server and returns when the same book filename is uploaded again.'
+    );
   }
 
   function renderUsers() {
@@ -377,6 +396,70 @@ $(document).ready(function () {
       });
     });
 
+    $deleteLibraryProgressCheckbox.on('change', updateDeleteLibraryProgressNote);
+
+    $('#deleteAllBooksButton').on('click', function () {
+      const removeReadingProgress = $deleteLibraryProgressCheckbox.prop('checked');
+
+      $deleteLibraryConfirmCopy.text(
+        removeReadingProgress
+          ? 'Delete every book from the library and remove all saved reading progress?'
+          : 'Delete every book from the library?'
+      );
+      $deleteLibraryConfirmNote.text(
+        removeReadingProgress
+          ? 'This will remove the EPUB files and clear saved reading locations for everyone.'
+          : 'Saved reading progress will stay on the server and can return if the same book filename is uploaded again.'
+      );
+
+      $deleteLibraryConfirmModal.modal({
+        closable: false,
+        autofocus: false
+      }).modal('show');
+    });
+
+    $('#cancelDeleteLibraryButton').on('click', function () {
+      $deleteLibraryConfirmModal.modal('hide');
+    });
+
+    $confirmDeleteLibraryButton.on('click', function () {
+      const removeReadingProgress = $deleteLibraryProgressCheckbox.prop('checked');
+      const $button = $(this);
+
+      setButtonBusy($button, true);
+
+      $.ajax({
+        url: '/api/books',
+        type: 'DELETE',
+        data: {
+          removeReadingProgress
+        },
+        success: function (response) {
+          $deleteLibraryConfirmModal.modal('hide');
+          alert(
+            response && response.deletedCount === 0
+              ? (
+                removeReadingProgress
+                  ? 'The library was already empty. Saved reading progress has been cleared.'
+                  : 'The library was already empty.'
+              )
+              : (
+                removeReadingProgress
+                  ? `Deleted ${response.deletedCount} book${response.deletedCount === 1 ? '' : 's'} and cleared all reading progress.`
+                  : `Deleted ${response.deletedCount} book${response.deletedCount === 1 ? '' : 's'}. Saved reading progress was kept.`
+              )
+          );
+        },
+        error: function (xhr) {
+          const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Unable to delete the library contents.';
+          alert(message);
+        },
+        complete: function () {
+          setButtonBusy($button, false);
+        }
+      });
+    });
+
     $('#createUserForm').on('submit', function (event) {
       event.preventDefault();
       const $button = $('#createUserButton');
@@ -474,6 +557,7 @@ $(document).ready(function () {
 
   function initialise() {
     bindEvents();
+    updateDeleteLibraryProgressNote();
 
     $.when(loadAppConfig(), loadSession()).then(function () {
       if (state.session && state.session.canManageSystem) {

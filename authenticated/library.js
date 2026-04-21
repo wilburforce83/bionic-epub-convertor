@@ -40,7 +40,8 @@ $(document).ready(function () {
     logs: [],
     mobileMenuOpen: false,
     pendingPostConversionRefresh: false,
-    autoRefreshInFlight: false
+    autoRefreshInFlight: false,
+    pendingBookAction: null
   };
 
   const $app = $('#libraryApp');
@@ -79,6 +80,11 @@ $(document).ready(function () {
   const $logsOutput = $('#logsOutput');
   const $menuToggle = $('#menuToggle');
   const $toolbarActions = $('#toolbarActions');
+  const $bookActionConfirmModal = $('#bookActionConfirmModal');
+  const $bookActionConfirmHeading = $('#bookActionConfirmHeading');
+  const $bookActionConfirmCopy = $('#bookActionConfirmCopy');
+  const $bookActionConfirmNote = $('#bookActionConfirmNote');
+  const $confirmBookActionButton = $('#confirmBookActionButton');
 
   function randomTipDelay() {
     return 10000 + Math.floor(Math.random() * 5000);
@@ -155,9 +161,42 @@ $(document).ready(function () {
     localStorage.setItem(THEME_STORAGE_KEY, state.theme);
   }
 
+  function canDeleteBooks() {
+    return Boolean(state.session && state.session.canManageSystem);
+  }
+
   function applySessionCapabilities() {
-    const isAdmin = Boolean(state.session && state.session.canManageSystem);
-    $adminTools.prop('hidden', !isAdmin);
+    $adminTools.prop('hidden', !canDeleteBooks());
+  }
+
+  function closeCardMenus() {
+    $cards.find('.card-menu').prop('hidden', true);
+    $cards.find('.card-menu-toggle').attr('aria-expanded', 'false');
+  }
+
+  function setConfirmButtonStyle(label, isDanger) {
+    $confirmBookActionButton
+      .text(label)
+      .removeClass('accent danger')
+      .addClass(isDanger ? 'danger' : 'accent');
+  }
+
+  function openBookActionConfirm(config) {
+    state.pendingBookAction = config;
+    $bookActionConfirmHeading.text(config.heading);
+    $bookActionConfirmCopy.text(config.copy);
+    $bookActionConfirmNote.text(config.note || '');
+    $bookActionConfirmNote.prop('hidden', !config.note);
+    setConfirmButtonStyle(config.confirmLabel, config.danger !== false);
+
+    $bookActionConfirmModal.modal({
+      closable: false,
+      autofocus: false,
+      onHidden: function () {
+        state.pendingBookAction = null;
+        setButtonBusy($confirmBookActionButton, false);
+      }
+    }).modal('show');
   }
 
   function applyBannerState() {
@@ -192,17 +231,39 @@ $(document).ready(function () {
   }
 
   function createCard(book) {
-    const $card = $('<article>').addClass('library-card').attr('data-filename', book.filename || '');
+    const filename = book.filename || '';
+    const titleText = book.title || filename || 'Untitled';
+    const $card = $('<article>').addClass('library-card').attr('data-filename', filename);
     const $coverSurface = $('<div>').addClass('cover-surface');
+    const $menuShell = $('<div>').addClass('card-menu-shell');
+    const $menuToggle = $('<button>')
+      .addClass('card-menu-toggle')
+      .attr({
+        type: 'button',
+        'aria-label': `Actions for ${titleText}`,
+        'aria-expanded': 'false',
+        'aria-haspopup': 'true'
+      })
+      .append($('<i>').addClass('ellipsis vertical icon').attr('aria-hidden', 'true'));
+    const $menu = $('<div>').addClass('card-menu').prop('hidden', true);
     const $image = $('<img>')
       .attr('src', book.cover || '')
-      .attr('alt', `${book.title || book.filename || 'Book'} cover`)
+      .attr('alt', `${titleText || 'Book'} cover`)
       .attr('loading', 'lazy');
     const $body = $('<div>').addClass('card-body');
-    const $title = $('<h2>').addClass('card-title').text(book.title || book.filename || 'Untitled');
+    const $title = $('<h2>').addClass('card-title').text(titleText);
     const $author = $('<p>').addClass('card-author').text(book.author || 'Unknown author');
     const $footer = $('<div>').addClass('card-footer');
     const $chip = $('<span>').addClass('card-chip');
+    const $resetAction = $('<button>')
+      .addClass('card-menu-action')
+      .attr({
+        type: 'button',
+        'data-action': 'reset-progress',
+        'data-filename': filename,
+        'data-title': titleText
+      })
+      .text('Reset reading state');
 
     $chip.append($('<i>').addClass('book icon').attr('aria-hidden', 'true'));
     $chip.append($('<span>').text('Read now'));
@@ -212,7 +273,24 @@ $(document).ready(function () {
       $(this).css('opacity', '0');
     });
 
-    $coverSurface.append($image);
+    $menu.append($resetAction);
+
+    if (canDeleteBooks()) {
+      $menu.append(
+        $('<button>')
+          .addClass('card-menu-action danger')
+          .attr({
+            type: 'button',
+            'data-action': 'delete-book',
+            'data-filename': filename,
+            'data-title': titleText
+          })
+          .text('Delete book')
+      );
+    }
+
+    $menuShell.append($menuToggle, $menu);
+    $coverSurface.append($image, $menuShell);
     $footer.append($chip);
     $body.append($title, $author, $footer);
     $card.append($coverSurface, $body);
@@ -227,6 +305,7 @@ $(document).ready(function () {
 
   function renderBooks() {
     const filteredBooks = getFilteredBooks();
+    closeCardMenus();
     $cards.empty();
 
     filteredBooks.forEach(function (book) {
@@ -404,9 +483,11 @@ $(document).ready(function () {
     return $.get('/api/session').then(function (payload) {
       state.session = payload || null;
       applySessionCapabilities();
+      renderBooks();
     }).catch(function () {
       state.session = null;
       applySessionCapabilities();
+      renderBooks();
     });
   }
 
@@ -525,6 +606,80 @@ $(document).ready(function () {
       $dropZone.text(files.length > 1 ? `${files.length} files selected` : files[0].name);
     });
 
+    $cards.on('click', '.card-menu-toggle', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const $button = $(this);
+      const isOpen = $button.attr('aria-expanded') === 'true';
+
+      closeCardMenus();
+
+      if (!isOpen) {
+        $button.attr('aria-expanded', 'true');
+        $button.siblings('.card-menu').prop('hidden', false);
+      }
+    });
+
+    $cards.on('click', '.card-menu', function (event) {
+      event.stopPropagation();
+    });
+
+    $cards.on('click', '.card-menu-action', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const $action = $(this);
+      const actionType = String($action.data('action') || '');
+      const filename = String($action.data('filename') || '');
+      const title = String($action.data('title') || 'Untitled');
+
+      closeCardMenus();
+
+      if (!filename) {
+        return;
+      }
+
+      if (actionType === 'reset-progress') {
+        openBookActionConfirm({
+          heading: 'Reset reading state',
+          copy: `Reset your saved reading state for "${title}"?`,
+          note: 'This clears your saved location for this book so it opens from the beginning next time.',
+          confirmLabel: 'Reset reading state',
+          danger: false,
+          request: function () {
+            return $.ajax({
+              url: `/api/reading-progress/${encodeURIComponent(filename)}`,
+              type: 'DELETE'
+            });
+          },
+          successMessage: function () {
+            return `Reading state reset for ${title}.`;
+          }
+        });
+        return;
+      }
+
+      if (actionType === 'delete-book') {
+        openBookActionConfirm({
+          heading: 'Delete book',
+          copy: `Delete "${title}" from the library?`,
+          note: 'The book file will be removed now, but saved reading progress stays on the server so it can return if you upload the same filename again.',
+          confirmLabel: 'Delete book',
+          danger: true,
+          request: function () {
+            return $.ajax({
+              url: `/api/books/${encodeURIComponent(filename)}`,
+              type: 'DELETE'
+            });
+          },
+          successMessage: function () {
+            return `${title} was deleted from the library. Saved reading progress was kept.`;
+          }
+        });
+      }
+    });
+
     $searchBar.on('input', function () {
       state.query = $(this).val() || '';
       renderBooks();
@@ -560,6 +715,36 @@ $(document).ready(function () {
       $('#logsModal').modal('hide');
     });
 
+    $('#cancelBookActionButton').on('click', function () {
+      $bookActionConfirmModal.modal('hide');
+    });
+
+    $confirmBookActionButton.on('click', function () {
+      const action = state.pendingBookAction;
+      const $button = $(this);
+
+      if (!action || typeof action.request !== 'function') {
+        return;
+      }
+
+      setButtonBusy($button, true);
+
+      action.request().done(function (response) {
+        $bookActionConfirmModal.modal('hide');
+        alert(
+          typeof action.successMessage === 'function'
+            ? action.successMessage(response || {})
+            : (action.successMessage || 'Action completed.')
+        );
+        refreshDashboard();
+      }).fail(function (xhr) {
+        const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Unable to complete that action.';
+        alert(message);
+      }).always(function () {
+        setButtonBusy($button, false);
+      });
+    });
+
     $('#clearLogsButton').on('click', function () {
       const $button = $(this);
       setButtonBusy($button, true);
@@ -587,6 +772,12 @@ $(document).ready(function () {
       $(this).attr('aria-expanded', String(state.mobileMenuOpen));
     });
 
+    $(document).on('click', function (event) {
+      if (!$(event.target).closest('.card-menu-shell').length) {
+        closeCardMenus();
+      }
+    });
+
     $(window).on('resize', function () {
       if (window.innerWidth > 1039) {
         closeMobileMenu();
@@ -596,6 +787,7 @@ $(document).ready(function () {
     $(document).on('keydown', function (event) {
       if (event.key === 'Escape') {
         closeMobileMenu();
+        closeCardMenus();
       }
     });
   }

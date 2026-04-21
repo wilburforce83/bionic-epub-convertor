@@ -8,6 +8,11 @@ const AdmZip = require('adm-zip');
 const { createEpub, resolveZipEntryPath } = require('../utils/fileUtils');
 const { processHtmlFiles } = require('../utils/htmlProcessor');
 const { extractEpubData, getEpubs } = require('../utils/epubDataUtils');
+const {
+  deleteLibraryBookFiles,
+  listLibraryBookFilenames,
+  removeReadingProgressForUserAndFilename
+} = require('../utils/libraryMaintenance');
 const { createMinimalEpub } = require('./helpers/epubTestUtils');
 
 async function makeTempDir(prefix) {
@@ -171,4 +176,56 @@ test('extractEpubData keeps an explicit cover image when the EPUB declares one i
   assert.equal(books[0].title, 'Cover Book');
   assert.equal(books[0].author, 'Codex');
   assert.match(books[0].cover, /^data:image\/png;base64,/);
+});
+
+test('libraryMaintenance lists and deletes only EPUB library files', async () => {
+  const tempDir = await makeTempDir('dyslibria-library-delete-');
+  const processedDir = path.join(tempDir, 'processed');
+
+  await fs.ensureDir(processedDir);
+  await createMinimalEpub(path.join(processedDir, 'keep.epub'));
+  await createMinimalEpub(path.join(processedDir, 'remove.epub'));
+  await fs.writeFile(path.join(processedDir, 'notes.txt'), 'not a book');
+
+  const filenames = await listLibraryBookFilenames(processedDir);
+  const deletedFilenames = await deleteLibraryBookFiles(processedDir, ['remove.epub', 'notes.txt']);
+
+  assert.deepEqual(filenames, ['keep.epub', 'remove.epub']);
+  assert.deepEqual(deletedFilenames, ['remove.epub']);
+  assert.equal(await fs.pathExists(path.join(processedDir, 'keep.epub')), true);
+  assert.equal(await fs.pathExists(path.join(processedDir, 'remove.epub')), false);
+  assert.equal(await fs.pathExists(path.join(processedDir, 'notes.txt')), true);
+});
+
+test('libraryMaintenance removes both current and legacy reading progress keys for one user and filename', () => {
+  const entries = {
+    'user-1::book.epub': {
+      filename: 'book.epub',
+      userId: 'user-1',
+      username: 'reader-one'
+    },
+    'reader-one::book.epub': {
+      filename: 'book.epub',
+      userId: 'reader-one',
+      username: 'reader-one'
+    },
+    'user-1::other.epub': {
+      filename: 'other.epub',
+      userId: 'user-1',
+      username: 'reader-one'
+    },
+    'user-2::book.epub': {
+      filename: 'book.epub',
+      userId: 'user-2',
+      username: 'reader-two'
+    }
+  };
+
+  const result = removeReadingProgressForUserAndFilename(entries, {
+    id: 'user-1',
+    username: 'reader-one'
+  }, 'book.epub');
+
+  assert.equal(result.removedCount, 2);
+  assert.deepEqual(Object.keys(result.nextEntries).sort(), ['user-1::other.epub', 'user-2::book.epub']);
 });

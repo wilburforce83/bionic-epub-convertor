@@ -19,6 +19,11 @@ const { loadDictionary } = require('./utils/dictionaryUtils');
 const { extractResources, createEpub } = require('./utils/fileUtils');
 const { processHtmlFiles } = require('./utils/htmlProcessor');
 const { extractEpubData, getEpubs } = require('./utils/epubDataUtils');
+const {
+  deleteLibraryBookFiles,
+  listLibraryBookFilenames,
+  removeReadingProgressForUserAndFilename
+} = require('./utils/libraryMaintenance');
 const { createUserStore, DEFAULT_BOOTSTRAP_USERNAME, DEFAULT_BOOTSTRAP_PASSWORD } = require('./utils/userStore');
 
 const app = express();
@@ -441,6 +446,11 @@ function readStoredProgress(user, filename) {
   }
 
   return null;
+}
+
+function replaceReadingProgressEntries(nextEntries) {
+  readingProgressDb.JSON(nextEntries);
+  readingProgressDb.sync();
 }
 
 function sanitizeProgressPayload(payload) {
@@ -1111,28 +1121,36 @@ app.get('/epub/:filename', requireCatalogAuth, async (req, res) => {
   });
 });
 
-app.get('/api/reading-progress', isAuthenticated, (req, res) => {
+app.get('/api/reading-progress', isAuthenticated, async (req, res) => {
   const currentUser = getReadingProgressUser(req);
   if (!currentUser) {
     res.status(401).json({ success: false, message: 'Authentication required.' });
     return;
   }
 
-  const entries = Object.values(readingProgressDb.JSON())
-    .filter((entry) => entry && entry.filename && (
-      entry.userId === currentUser.id ||
-      entry.userId === currentUser.username
-    ))
-    .sort((left, right) => {
-      const leftTime = Date.parse(left.updatedAt || 0) || 0;
-      const rightTime = Date.parse(right.updatedAt || 0) || 0;
-      return rightTime - leftTime;
-    });
+  try {
+    const availableBooks = await getEpubs({ includeInvalid: true });
+    const availableFilenames = new Set(availableBooks.map((entry) => entry.filename));
+    const entries = Object.values(readingProgressDb.JSON())
+      .filter((entry) => entry && entry.filename && availableFilenames.has(entry.filename) && (
+        entry.userId === currentUser.id ||
+        entry.userId === currentUser.username ||
+        entry.username === currentUser.username
+      ))
+      .sort((left, right) => {
+        const leftTime = Date.parse(left.updatedAt || 0) || 0;
+        const rightTime = Date.parse(right.updatedAt || 0) || 0;
+        return rightTime - leftTime;
+      });
 
-  res.json({
-    success: true,
-    progress: entries
-  });
+    res.json({
+      success: true,
+      progress: entries
+    });
+  } catch (error) {
+    console.error('Error loading reading progress:', error);
+    res.status(500).json({ success: false, message: 'Unable to load reading progress.' });
+  }
 });
 
 app.get('/api/reading-progress/:filename', isAuthenticated, (req, res) => {
@@ -1182,6 +1200,88 @@ app.post('/api/reading-progress/:filename', isAuthenticated, async (req, res) =>
     res.json({ success: true, progress: storedRecord });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message || 'Invalid reading progress payload.' });
+  }
+});
+
+app.delete('/api/reading-progress/:filename', isAuthenticated, (req, res) => {
+  const filename = sanitizeEpubFilename(req.params.filename);
+
+  if (!filename) {
+    res.status(400).json({ success: false, message: 'Invalid EPUB file name.' });
+    return;
+  }
+
+  const currentUser = getReadingProgressUser(req);
+  if (!currentUser) {
+    res.status(401).json({ success: false, message: 'Authentication required.' });
+    return;
+  }
+
+  const result = removeReadingProgressForUserAndFilename(readingProgressDb.JSON(), currentUser, filename);
+  replaceReadingProgressEntries(result.nextEntries);
+
+  res.json({
+    success: true,
+    removedCount: result.removedCount
+  });
+});
+
+app.delete('/api/books/:filename', requireAdmin, async (req, res) => {
+  const filename = sanitizeEpubFilename(req.params.filename);
+
+  if (!filename) {
+    res.status(400).json({ success: false, message: 'Invalid EPUB file name.' });
+    return;
+  }
+
+  try {
+    const deletedFilenames = await deleteLibraryBookFiles(processedDir, [filename]);
+
+    if (!deletedFilenames.length) {
+      res.status(404).json({ success: false, message: 'Book not found in the library.' });
+      return;
+    }
+
+    await extractEpubData(processedDir);
+    appendConversionLog('info', `Deleted library book ${filename}.`);
+
+    res.json({
+      success: true,
+      deletedCount: deletedFilenames.length,
+      deletedFilenames
+    });
+  } catch (error) {
+    console.error('Error deleting library book:', error);
+    res.status(500).json({ success: false, message: 'Unable to delete the book.' });
+  }
+});
+
+app.delete('/api/books', requireAdmin, async (req, res) => {
+  const removeReadingProgress = normalizeBoolean(req.body && req.body.removeReadingProgress, true);
+
+  try {
+    const filenames = await listLibraryBookFilenames(processedDir);
+    const deletedFilenames = await deleteLibraryBookFiles(processedDir, filenames);
+
+    if (removeReadingProgress) {
+      replaceReadingProgressEntries({});
+    }
+
+    await extractEpubData(processedDir);
+    appendConversionLog(
+      'info',
+      `Deleted ${deletedFilenames.length} library book${deletedFilenames.length === 1 ? '' : 's'}${removeReadingProgress ? ' and cleared all reading progress.' : '.'}`
+    );
+
+    res.json({
+      success: true,
+      deletedCount: deletedFilenames.length,
+      deletedFilenames,
+      removedReadingProgress: removeReadingProgress
+    });
+  } catch (error) {
+    console.error('Error clearing library:', error);
+    res.status(500).json({ success: false, message: 'Unable to delete the library contents.' });
   }
 });
 

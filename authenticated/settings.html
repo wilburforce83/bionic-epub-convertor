@@ -235,8 +235,54 @@
 
           <div class="user-list" id="userList" aria-live="polite"></div>
         </section>
+
+        <section class="settings-section admin-section" id="dangerSection" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Library</p>
+              <h2>Danger zone</h2>
+            </div>
+          </div>
+
+          <div class="danger-card">
+            <div>
+              <span class="meta-pill danger-pill">Destructive action</span>
+              <h3>Delete all books from the library</h3>
+              <p class="danger-copy">
+                This removes every EPUB currently stored in Dyslibria.
+              </p>
+            </div>
+
+            <label class="danger-checkbox" for="deleteLibraryProgressCheckbox">
+              <input type="checkbox" id="deleteLibraryProgressCheckbox" checked>
+              <span>Remove all reading progress</span>
+            </label>
+
+            <p class="danger-note" id="deleteLibraryProgressNote">
+              Reading progress will be removed for everyone as part of this reset.
+            </p>
+
+            <div class="section-actions">
+              <button class="ui button app-button danger" type="button" id="deleteAllBooksButton">
+                Delete all books
+              </button>
+            </div>
+          </div>
+        </section>
       </section>
     </main>
+  </div>
+
+  <div class="ui small modal" id="deleteLibraryConfirmModal">
+    <div class="header">Delete library books</div>
+    <div class="content">
+      <p class="confirm-modal-copy" id="deleteLibraryConfirmCopy"></p>
+      <p class="confirm-modal-note" id="deleteLibraryConfirmNote"></p>
+    </div>
+    <div class="actions">
+      <button class="ui button" id="cancelDeleteLibraryButton" type="button">Cancel</button>
+      <button class="ui button app-button danger" id="confirmDeleteLibraryButton" type="button">Delete all books</button>
+    </div>
   </div>
 </body>
 

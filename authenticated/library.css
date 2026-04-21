@@ -244,6 +244,12 @@ body.theme-dark {
   box-shadow: none !important;
 }
 
+.app-button.danger {
+  background: #b94639 !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
 .mobile-menu-button {
   display: none !important;
 }
@@ -440,6 +446,85 @@ body.theme-dark {
   background: rgba(255, 255, 255, 0.52);
 }
 
+.card-menu-shell {
+  position: absolute;
+  top: 0.8rem;
+  right: 0.8rem;
+  z-index: 3;
+  display: grid;
+  justify-items: end;
+}
+
+.card-menu-toggle {
+  width: 2.5rem;
+  min-height: 2.5rem;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(24, 16, 14, 0.74);
+  color: #f7eee8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.card-menu-toggle:hover,
+.card-menu-toggle:focus-visible {
+  background: rgba(24, 16, 14, 0.9);
+  transform: translateY(-1px);
+}
+
+.card-menu-toggle .icon {
+  margin: 0;
+}
+
+.card-menu[hidden] {
+  display: none !important;
+}
+
+.card-menu {
+  min-width: 12.5rem;
+  margin-top: 0.45rem;
+  padding: 0.35rem;
+  border: 1px solid var(--library-border);
+  border-radius: var(--ui-radius);
+  background: var(--library-panel);
+  box-shadow: var(--library-shadow);
+  display: grid;
+  gap: 0.2rem;
+}
+
+.card-menu-action {
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+  border: 0;
+  border-radius: calc(var(--ui-radius) - 1px);
+  background: transparent;
+  color: var(--library-text);
+  text-align: left;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.card-menu-action:hover,
+.card-menu-action:focus-visible {
+  background: var(--library-highlight);
+  color: var(--library-accent-strong);
+}
+
+.card-menu-action.danger {
+  color: #b94639;
+}
+
+.card-menu-action.danger:hover,
+.card-menu-action.danger:focus-visible {
+  background: rgba(185, 70, 57, 0.12);
+  color: #b94639;
+}
+
 .cover-surface img {
   display: block;
   width: 100%;
@@ -624,6 +709,17 @@ body.theme-dark .logs-output {
   box-shadow: inset 0 0 0 1px var(--library-border) !important;
 }
 
+.confirm-modal-copy,
+.confirm-modal-note {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.confirm-modal-note {
+  margin-top: 0.8rem;
+  color: var(--library-muted);
+}
+
 .settings-install-link-row {
   margin-top: 1rem;
   padding-top: 1rem;
@@ -776,6 +872,10 @@ body.theme-dark .logs-output {
   .library-grid {
     grid-template-columns: repeat(auto-fill, minmax(156px, 1fr));
     gap: 0.9rem;
+  }
+
+  .card-menu {
+    min-width: 11.25rem;
   }
 
   .card-title {

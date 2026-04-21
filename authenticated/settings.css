@@ -185,14 +185,16 @@ body.theme-light {
 
 .theme-dark .profile-summary,
 .theme-dark .install-card,
-.theme-dark .user-card {
+.theme-dark .user-card,
+.theme-dark .danger-card {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .theme-light .profile-summary,
 .theme-light .install-card,
-.theme-light .user-card {
+.theme-light .user-card,
+.theme-light .danger-card {
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid rgba(71, 48, 39, 0.08);
 }
@@ -266,6 +268,51 @@ body.theme-light {
 .user-card {
   border-radius: 0.65rem;
   padding: 1rem 1.15rem;
+}
+
+.danger-card {
+  border-radius: 0.65rem;
+  padding: 1.15rem 1.2rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.danger-pill {
+  background: rgba(185, 70, 57, 0.14);
+  color: #b94639;
+}
+
+.danger-card h3 {
+  margin: 0.85rem 0 0;
+  font-size: 1.18rem;
+}
+
+.danger-copy,
+.danger-note {
+  margin: 0.45rem 0 0;
+  line-height: 1.6;
+}
+
+.theme-dark .danger-copy,
+.theme-dark .danger-note {
+  color: var(--settings-muted-dark);
+}
+
+.theme-light .danger-copy,
+.theme-light .danger-note {
+  color: var(--settings-muted-light);
+}
+
+.danger-checkbox {
+  display: inline-flex;
+  align-items: start;
+  gap: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.danger-checkbox input {
+  margin-top: 0.2rem;
 }
 
 .user-card-header {
