@@ -489,7 +489,7 @@ $(document).ready(function () {
       setButtonBusy($button, true);
 
       $.post('/update-database', function () {
-        showNotice('Library refresh completed.', 'success');
+        showNotice('Library metadata and cover images were rebuilt.', 'success');
       }).fail(function (xhr) {
         const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Unable to refresh the library.';
         showNotice(message, 'error', {

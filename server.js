@@ -523,7 +523,10 @@ function buildBookCoverUrl(epub) {
     return '';
   }
 
-  const version = encodeURIComponent(String(epub.lastModified || ''));
+  const version = encodeURIComponent([
+    String(epub.lastModified || ''),
+    String(epub.metadataRefreshedAt || '')
+  ].filter(Boolean).join(':'));
   return `/api/books/${encodeURIComponent(filename)}/cover${version ? `?v=${version}` : ''}`;
 }
 
@@ -1319,7 +1322,10 @@ app.get('/api/books/:filename/cover', requireCatalogAuth, async (req, res) => {
     }
 
     res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
-    res.setHeader('ETag', `"${createStableId(`${filename}:${book.lastModified || ''}:${String(book.cover || '').length}`)}"`);
+    res.setHeader(
+      'ETag',
+      `"${createStableId(`${filename}:${book.lastModified || ''}:${book.metadataRefreshedAt || ''}:${String(book.cover || '').length}`)}"`
+    );
     res.type(coverAsset.mimeType);
     res.send(coverAsset.buffer);
   } catch (error) {

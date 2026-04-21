@@ -165,7 +165,43 @@ test('extractEpubData keeps an explicit cover image when the EPUB declares one i
   assert.equal(books.length, 1);
   assert.equal(books[0].title, 'Cover Book');
   assert.equal(books[0].author, 'Codex');
+  assert.ok(Date.parse(books[0].metadataRefreshedAt));
   assert.match(books[0].cover, /^data:image\/png;base64,/);
+});
+
+test('extractEpubData does not replace an explicit cover with a larger fallback image', async () => {
+  const tempDir = await makeTempDir('dyslibria-cover-priority-');
+  const processedDir = path.join(tempDir, 'processed');
+  const cachePath = path.join(tempDir, 'db', 'epubData.json');
+  const largeIllustrationSvg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="2400" viewBox="0 0 1600 2400">
+  <rect width="1600" height="2400" fill="#214f84"/>
+  <circle cx="800" cy="900" r="420" fill="#f4d35e"/>
+  <rect x="320" y="1500" width="960" height="380" rx="48" fill="#ffffff"/>
+  <text x="800" y="1710" text-anchor="middle" font-size="144" font-family="Georgia">Frontispiece</text>
+</svg>`;
+
+  await fs.ensureDir(processedDir);
+  await createMinimalEpub(path.join(processedDir, 'cover-priority.epub'), {
+    title: 'Priority Cover',
+    author: 'Codex',
+    coverFileName: 'images/cover.png',
+    coverImageBase64: tinyPngBase64,
+    extraFiles: [
+      {
+        fileName: 'images/frontispiece.svg',
+        content: largeIllustrationSvg
+      }
+    ]
+  });
+
+  await extractEpubData(processedDir, { cachePath });
+
+  const books = await getEpubs({ cachePath });
+
+  assert.equal(books.length, 1);
+  assert.match(books[0].cover, /^data:image\/png;base64,/);
+  assert.ok(!books[0].cover.includes('PHN2Zy'));
 });
 
 test('libraryMaintenance lists and deletes only EPUB library files', async () => {

@@ -18,13 +18,14 @@ function isEpubFilename(fileName) {
   return /\.epub$/i.test(fileName);
 }
 
-function getDefaultMetaData(file, fileStat) {
+function getDefaultMetaData(file, fileStat, metadataRefreshedAt) {
   return {
     filename: file,
     title: file.replace(/\.epub$/i, ''),
     author: '',
     cover: `data:image/jpg;base64,${defaultBase64Image}`,
     lastModified: fileStat.mtime.toISOString(),
+    metadataRefreshedAt,
     isValid: true
   };
 }
@@ -149,6 +150,7 @@ async function extractEpubData(processedDir, options = {}) {
 
   const epubFiles = await fs.readdir(processedDir);
   const epubData = [];
+  const metadataRefreshedAt = new Date().toISOString();
 
   for (const file of epubFiles) {
     const filePath = path.join(processedDir, file);
@@ -158,7 +160,7 @@ async function extractEpubData(processedDir, options = {}) {
       continue;
     }
 
-    const metaData = getDefaultMetaData(file, fileStat);
+    const metaData = getDefaultMetaData(file, fileStat, metadataRefreshedAt);
 
     try {
       const zip = new AdmZip(filePath);
@@ -166,6 +168,7 @@ async function extractEpubData(processedDir, options = {}) {
       const entryMap = new Map();
       let bestCover = null;
       let explicitCoverEntryName = '';
+      let explicitCoverResolved = false;
 
       for (const entry of zipEntries) {
         const normalizedEntryName = normalizeArchivePath(entry.entryName);
@@ -195,32 +198,35 @@ async function extractEpubData(processedDir, options = {}) {
         bestCover = tryReadCover(zip, explicitCoverEntry);
         if (bestCover) {
           metaData.cover = bestCover.value;
+          explicitCoverResolved = true;
         }
       }
 
-      for (const entry of zipEntries) {
-        const entryName = normalizeArchivePath(entry.entryName).toLowerCase();
+      if (!explicitCoverResolved) {
+        for (const entry of zipEntries) {
+          const entryName = normalizeArchivePath(entry.entryName).toLowerCase();
 
-        if (!isImageEntry(entryName)) {
-          continue;
-        }
+          if (!isImageEntry(entryName)) {
+            continue;
+          }
 
-        const coverCandidate = tryReadCover(zip, entry);
-        if (!coverCandidate) {
-          continue;
-        }
+          const coverCandidate = tryReadCover(zip, entry);
+          if (!coverCandidate) {
+            continue;
+          }
 
-        const looksLikeCover = entryName.includes('cover');
-        if (looksLikeCover || !bestCover || coverCandidate.size > bestCover.size) {
-          bestCover = coverCandidate;
-          if (looksLikeCover || !metaData.cover || metaData.cover.includes(defaultBase64Image)) {
-            metaData.cover = coverCandidate.value;
+          const looksLikeCover = entryName.includes('cover');
+          if (looksLikeCover || !bestCover || coverCandidate.size > bestCover.size) {
+            bestCover = coverCandidate;
+            if (looksLikeCover || !metaData.cover || metaData.cover.includes(defaultBase64Image)) {
+              metaData.cover = coverCandidate.value;
+            }
           }
         }
-      }
 
-      if (bestCover && metaData.cover !== bestCover.value) {
-        metaData.cover = bestCover.value;
+        if (bestCover && metaData.cover !== bestCover.value) {
+          metaData.cover = bestCover.value;
+        }
       }
     } catch (error) {
       metaData.isValid = false;

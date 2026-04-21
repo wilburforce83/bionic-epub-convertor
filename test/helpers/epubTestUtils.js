@@ -23,7 +23,8 @@ async function createMinimalEpub(outputPath, options = {}) {
     chapterFileName = 'chapter1.xhtml',
     chapterMarkup,
     coverFileName,
-    coverImageBase64
+    coverImageBase64,
+    extraFiles = []
   } = options;
 
   await fs.ensureDir(path.dirname(outputPath));
@@ -85,6 +86,15 @@ async function createMinimalEpub(outputPath, options = {}) {
 
   if (coverFileName && coverImageBase64) {
     zip.file(`OEBPS/${coverFileName}`, Buffer.from(coverImageBase64, 'base64'));
+  }
+
+  for (const extraFile of extraFiles) {
+    if (!extraFile || !extraFile.fileName) {
+      continue;
+    }
+
+    const encoding = extraFile.encoding === 'base64' ? 'base64' : 'utf-8';
+    zip.file(`OEBPS/${extraFile.fileName}`, Buffer.from(extraFile.content || '', encoding));
   }
 
   const buffer = await zip.generateAsync({
