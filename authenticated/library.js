@@ -254,7 +254,12 @@ $(document).ready(function () {
     const $title = $('<h2>').addClass('card-title').text(titleText);
     const $author = $('<p>').addClass('card-author').text(book.author || 'Unknown author');
     const $footer = $('<div>').addClass('card-footer');
-    const $chip = $('<span>').addClass('card-chip');
+    const $readLink = $('<a>')
+      .addClass('card-chip card-read-link')
+      .attr({
+        href: `reader.html?file=${encodeURIComponent(filename)}`,
+        'aria-label': `Read ${titleText}`
+      });
     const $resetAction = $('<button>')
       .addClass('card-menu-action')
       .attr({
@@ -265,8 +270,8 @@ $(document).ready(function () {
       })
       .text('Reset reading state');
 
-    $chip.append($('<i>').addClass('book icon').attr('aria-hidden', 'true'));
-    $chip.append($('<span>').text('Read now'));
+    $readLink.append($('<i>').addClass('book icon').attr('aria-hidden', 'true'));
+    $readLink.append($('<span>').text('Read now'));
 
     $image.on('error', function () {
       $coverSurface.addClass('is-fallback');
@@ -291,14 +296,9 @@ $(document).ready(function () {
 
     $menuShell.append($menuToggle, $menu);
     $coverSurface.append($image, $menuShell);
-    $footer.append($chip);
+    $footer.append($readLink);
     $body.append($title, $author, $footer);
     $card.append($coverSurface, $body);
-
-    $card.on('click', function () {
-      const filename = $(this).data('filename');
-      window.location.href = `reader.html?file=${encodeURIComponent(filename)}`;
-    });
 
     return $card;
   }

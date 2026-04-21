@@ -431,11 +431,11 @@ body.theme-dark {
   background: var(--library-panel);
   box-shadow: var(--library-shadow);
   overflow: hidden;
-  cursor: pointer;
   transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
 }
 
-.library-card:hover {
+.library-card:hover,
+.library-card:focus-within {
   transform: translateY(-3px);
 }
 
@@ -456,29 +456,30 @@ body.theme-dark {
 }
 
 .card-menu-toggle {
-  width: 2.5rem;
-  min-height: 2.5rem;
+  width: 2rem;
+  min-height: 2rem;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 999px;
-  background: rgba(24, 16, 14, 0.74);
-  color: #f7eee8;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.96);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  backdrop-filter: blur(12px);
-  transition: background 160ms ease, transform 160ms ease;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+  transition: color 160ms ease, opacity 160ms ease, transform 160ms ease;
 }
 
 .card-menu-toggle:hover,
 .card-menu-toggle:focus-visible {
-  background: rgba(24, 16, 14, 0.9);
+  color: #ffffff;
+  opacity: 0.92;
   transform: translateY(-1px);
 }
 
 .card-menu-toggle .icon {
   margin: 0;
+  font-size: 1rem;
 }
 
 .card-menu[hidden] {
@@ -592,6 +593,18 @@ body.theme-dark {
   background: var(--library-highlight);
   color: var(--library-accent-strong);
   font-size: 0.88rem;
+}
+
+.card-read-link {
+  text-decoration: none;
+  transition: transform 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.card-read-link:hover,
+.card-read-link:focus-visible {
+  background: var(--library-chip-muted);
+  color: var(--library-accent-strong);
+  transform: translateY(-1px);
 }
 
 .card-chip i {
