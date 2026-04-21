@@ -78,7 +78,7 @@ Example:
 
 ```bash
 git add .
-git commit -m "Prepare release v1.0.6"
+git commit -m "Prepare release v1.0.7"
 git push origin main
 ```
 
@@ -87,8 +87,8 @@ git push origin main
 Example:
 
 ```bash
-git tag v1.0.6
-git push origin v1.0.6
+git tag v1.0.7
+git push origin v1.0.7
 ```
 
 Pushing that tag triggers the Docker publish workflow automatically.
@@ -102,7 +102,7 @@ In GitHub Actions, check `Publish Docker Image` and confirm it succeeded.
 After the workflow finishes, confirm these image tags exist in Docker Hub:
 
 - `wilburforce83/dyslibria:latest`
-- `wilburforce83/dyslibria:1.0.6`
+- `wilburforce83/dyslibria:1.0.7`
 - `wilburforce83/dyslibria:1.0`
 
 ## Manual Publish Trigger
@@ -133,7 +133,7 @@ docker compose up -d
 If they want to stay on a specific release, they can export or define:
 
 ```env
-IMAGE_TAG=1.0.6
+IMAGE_TAG=1.0.7
 ```
 
 ## Release Checklist

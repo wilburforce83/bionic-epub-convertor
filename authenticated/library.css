@@ -831,6 +831,70 @@ body.theme-dark .app-notice.is-error {
   background: rgba(var(--library-accent-rgb), 0.08);
 }
 
+.drop-zone.is-disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.upload-progress-shell {
+  margin-top: 0.95rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--library-border);
+  border-radius: var(--ui-radius);
+  background: var(--library-chip);
+  display: grid;
+  gap: 0.65rem;
+}
+
+.upload-progress-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.85rem;
+}
+
+.upload-progress-header strong {
+  font-size: 0.98rem;
+}
+
+.upload-progress-percent {
+  font-family: var(--heading-font);
+  font-size: 1.25rem;
+}
+
+.upload-progress-track {
+  height: 0.55rem;
+}
+
+.upload-progress-copy,
+.upload-progress-meta {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.upload-progress-copy {
+  color: var(--library-text);
+}
+
+.upload-progress-meta {
+  color: var(--library-muted);
+  font-size: 0.92rem;
+}
+
+.upload-progress-shell.is-error {
+  border-color: rgba(185, 70, 57, 0.24);
+  background: rgba(255, 241, 239, 0.96);
+}
+
+.upload-progress-shell.is-error .upload-progress-fill {
+  background: linear-gradient(135deg, #b94639, #d96a57);
+}
+
+body.theme-dark .upload-progress-shell.is-error {
+  background: rgba(64, 28, 25, 0.95);
+  border-color: rgba(233, 130, 119, 0.24);
+}
+
 .logs-toolbar {
   display: flex;
   align-items: center;

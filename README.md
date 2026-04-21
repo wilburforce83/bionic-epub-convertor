@@ -75,7 +75,7 @@ docker compose up -d
 If you want to pin a release instead of tracking `latest`, set:
 
 ```env
-IMAGE_TAG=1.0.6
+IMAGE_TAG=1.0.7
 ```
 
 and then run:

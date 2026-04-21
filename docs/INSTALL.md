@@ -101,7 +101,7 @@ Useful optional values:
 MAIN_PORT=3000
 WEBDAV_PORT=1900
 BASE_URL=https://books.example.com
-IMAGE_TAG=1.0.6
+IMAGE_TAG=1.0.7
 SESSION_SECRET=replace-with-a-long-random-string
 ```
 

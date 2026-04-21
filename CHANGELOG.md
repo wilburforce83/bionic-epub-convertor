@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.7 - 2026-04-21
+
+### Added
+
+- an in-modal upload progress bar for library batch uploads, including live byte progress, queue confirmation, and clear failure messaging during large multi-book uploads
+- a new reader page margin slider so readers can move the text block further in from the edge of the screen and tune the page feel more like a dedicated ereader
+
+### Changed
+
+- kept the upload modal open and informative while files are still transferring or being validated by the server
+- tuned the reader padding logic so the new page margin setting stays comfortable across phone and larger-screen layouts
+
 ## 1.0.6 - 2026-04-21
 
 ### Added

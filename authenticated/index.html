@@ -209,7 +209,18 @@
           <input type="file" name="epubFiles" id="epubFiles" accept=".epub" multiple>
         </div>
         <div class="drop-zone" id="dropZone">Drag EPUB files here or click to choose them</div>
-        <button class="ui button app-button accent" type="submit">Convert and add to library</button>
+        <section class="upload-progress-shell" id="uploadProgress" aria-live="polite" hidden>
+          <div class="upload-progress-header">
+            <strong id="uploadProgressTitle">Choose books to upload</strong>
+            <span class="upload-progress-percent" id="uploadProgressPercent">0%</span>
+          </div>
+          <div class="progress-track upload-progress-track" aria-hidden="true">
+            <div class="progress-fill upload-progress-fill" id="uploadProgressFill"></div>
+          </div>
+          <p class="upload-progress-copy" id="uploadProgressCopy">Select one or more EPUB files to start a new conversion batch.</p>
+          <p class="upload-progress-meta" id="uploadProgressMeta">Nothing selected yet.</p>
+        </section>
+        <button class="ui button app-button accent" id="uploadSubmitButton" type="submit">Convert and add to library</button>
       </form>
     </div>
   </div>

@@ -48,7 +48,8 @@ $(document).ready(function () {
     noticeTimer: null,
     libraryLoading: true,
     usingCachedLibrary: false,
-    renderPassId: 0
+    renderPassId: 0,
+    uploading: false
   };
 
   const $app = $('#libraryApp');
@@ -70,6 +71,15 @@ $(document).ready(function () {
   const $searchBar = $('#searchBar');
   const $dropZone = $('#dropZone');
   const $fileInput = $('#epubFiles');
+  const $uploadModal = $('#uploadModal');
+  const $uploadForm = $('#uploadForm');
+  const $uploadSubmitButton = $('#uploadSubmitButton');
+  const $uploadProgress = $('#uploadProgress');
+  const $uploadProgressTitle = $('#uploadProgressTitle');
+  const $uploadProgressPercent = $('#uploadProgressPercent');
+  const $uploadProgressFill = $('#uploadProgressFill');
+  const $uploadProgressCopy = $('#uploadProgressCopy');
+  const $uploadProgressMeta = $('#uploadProgressMeta');
   const $adminTools = $('.admin-tool');
   const $themeToggle = $('#themeToggle');
   const $themeToggleIcon = $('#themeToggleIcon');
@@ -163,6 +173,98 @@ $(document).ready(function () {
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
+  }
+
+  function formatBytes(value) {
+    const size = Number(value) || 0;
+    if (size <= 0) {
+      return '0 B';
+    }
+
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let unitIndex = 0;
+    let currentValue = size;
+
+    while (currentValue >= 1024 && unitIndex < units.length - 1) {
+      currentValue /= 1024;
+      unitIndex += 1;
+    }
+
+    const precision = currentValue >= 10 || unitIndex === 0 ? 0 : 1;
+    return `${currentValue.toFixed(precision)} ${units[unitIndex]}`;
+  }
+
+  function getSelectedUploadFiles() {
+    const input = $fileInput.get(0);
+    return input && input.files ? Array.from(input.files) : [];
+  }
+
+  function summarizeFiles(files) {
+    return files.reduce(function (summary, file) {
+      return {
+        count: summary.count + 1,
+        totalBytes: summary.totalBytes + (Number(file && file.size) || 0)
+      };
+    }, {
+      count: 0,
+      totalBytes: 0
+    });
+  }
+
+  function setUploadBusy(busy) {
+    state.uploading = Boolean(busy);
+    setButtonBusy($uploadSubmitButton, state.uploading);
+    $fileInput.prop('disabled', state.uploading);
+    $dropZone.toggleClass('is-disabled', state.uploading);
+  }
+
+  function setUploadProgressState(config) {
+    const options = config || {};
+    const percent = Math.max(0, Math.min(100, Number(options.percent) || 0));
+
+    $uploadProgress.prop('hidden', false).toggleClass('is-error', options.tone === 'error');
+    $uploadProgressTitle.text(options.title || 'Preparing upload');
+    $uploadProgressPercent.text(`${Math.round(percent)}%`);
+    $uploadProgressFill.css('width', `${percent}%`);
+    $uploadProgressCopy.text(options.copy || '');
+    $uploadProgressMeta.text(options.meta || '');
+  }
+
+  function syncSelectedFilesUi() {
+    const files = getSelectedUploadFiles();
+
+    if (!files.length) {
+      $dropZone.text('Drag EPUB files here or click to choose them');
+      $uploadProgress.prop('hidden', true).removeClass('is-error');
+      $uploadProgressFill.css('width', '0%');
+      $uploadProgressPercent.text('0%');
+      return;
+    }
+
+    const summary = summarizeFiles(files);
+    $dropZone.text(files.length > 1 ? `${files.length} files selected` : files[0].name);
+    setUploadProgressState({
+      percent: 0,
+      title: files.length > 1 ? `${files.length} books selected` : files[0].name,
+      copy: `Ready to upload ${summary.count} EPUB${summary.count === 1 ? '' : 's'} into Dyslibria's conversion queue.`,
+      meta: `${formatBytes(summary.totalBytes)} total. Click "Convert and add to library" when you're ready.`
+    });
+  }
+
+  function resetUploadFormState() {
+    setUploadBusy(false);
+    const formElement = $uploadForm.get(0);
+    if (formElement) {
+      formElement.reset();
+    }
+
+    $dropZone.removeClass('dragover is-disabled').text('Drag EPUB files here or click to choose them');
+    $uploadProgress.prop('hidden', true).removeClass('is-error');
+    $uploadProgressFill.css('width', '0%');
+    $uploadProgressPercent.text('0%');
+    $uploadProgressTitle.text('Choose books to upload');
+    $uploadProgressCopy.text('Select one or more EPUB files to start a new conversion batch.');
+    $uploadProgressMeta.text('Nothing selected yet.');
   }
 
   function buildBookCoverUrl(book) {
@@ -800,9 +902,20 @@ $(document).ready(function () {
   function bindEvents() {
     $dismissLibraryNotice.on('click', clearNotice);
 
+    $uploadModal.modal({
+      autofocus: false,
+      closable: true,
+      onHide: function () {
+        return !state.uploading;
+      },
+      onHidden: function () {
+        resetUploadFormState();
+      }
+    });
+
     $('#uploadButton').on('click', function () {
       closeMobileMenu();
-      $('#uploadModal').modal('show');
+      $uploadModal.modal('show');
     });
 
     $('#settingsButton').on('click', function () {
@@ -810,9 +923,33 @@ $(document).ready(function () {
       window.location.href = 'settings.html';
     });
 
-    $('#uploadForm').on('submit', function (event) {
+    $uploadForm.on('submit', function (event) {
       event.preventDefault();
+      const selectedFiles = getSelectedUploadFiles();
+      const fileSummary = summarizeFiles(selectedFiles);
+
+      if (!selectedFiles.length) {
+        showNotice('Choose one or more EPUB files before starting an upload.', 'error', {
+          title: 'No books selected'
+        });
+        setUploadProgressState({
+          percent: 0,
+          title: 'Choose books to upload',
+          copy: 'Select one or more EPUB files to start a new conversion batch.',
+          meta: 'Nothing selected yet.',
+          tone: 'error'
+        });
+        return;
+      }
+
       const formData = new FormData(this);
+      setUploadBusy(true);
+      setUploadProgressState({
+        percent: 0,
+        title: fileSummary.count > 1 ? `Uploading ${fileSummary.count} books` : `Uploading ${selectedFiles[0].name}`,
+        copy: 'Sending files to Dyslibria. Keep this window open until the queue confirmation appears.',
+        meta: `${formatBytes(fileSummary.totalBytes)} total selected.`
+      });
 
       $.ajax({
         url: '/upload',
@@ -820,18 +957,78 @@ $(document).ready(function () {
         data: formData,
         processData: false,
         contentType: false,
-        success: function () {
-          $('#uploadModal').modal('hide');
-          showNotice('Upload received. Dyslibria has started converting your files.', 'success');
+        xhr: function () {
+          const xhr = $.ajaxSettings.xhr();
+
+          if (xhr && xhr.upload) {
+            xhr.upload.addEventListener('progress', function (progressEvent) {
+              if (!progressEvent.lengthComputable) {
+                setUploadProgressState({
+                  percent: 0,
+                  title: fileSummary.count > 1 ? `Uploading ${fileSummary.count} books` : `Uploading ${selectedFiles[0].name}`,
+                  copy: 'Sending files to Dyslibria. Upload size is still being calculated.',
+                  meta: `${formatBytes(fileSummary.totalBytes)} total selected.`
+                });
+                return;
+              }
+
+              const percent = progressEvent.total > 0
+                ? Math.round((progressEvent.loaded / progressEvent.total) * 100)
+                : 0;
+
+              setUploadProgressState({
+                percent,
+                title: fileSummary.count > 1 ? `Uploading ${fileSummary.count} books` : `Uploading ${selectedFiles[0].name}`,
+                copy: percent >= 100
+                  ? 'Upload complete. Dyslibria is now validating the files and adding them to the conversion queue.'
+                  : `${formatBytes(progressEvent.loaded)} of ${formatBytes(progressEvent.total)} uploaded.`,
+                meta: fileSummary.count > 1
+                  ? `${fileSummary.count} EPUBs in this batch.`
+                  : '1 EPUB in this batch.'
+              });
+            });
+          }
+
+          return xhr;
+        },
+        success: function (response) {
+          const queuedCount = Array.isArray(response && response.queuedFiles) ? response.queuedFiles.length : fileSummary.count;
+
+          setUploadProgressState({
+            percent: 100,
+            title: queuedCount === 1 ? '1 book queued' : `${queuedCount} books queued`,
+            copy: 'Upload complete. Dyslibria has accepted the batch and started conversion work.',
+            meta: 'You can follow conversion progress from the queue status pill and the conversion log.'
+          });
+          setUploadBusy(false);
+          window.setTimeout(function () {
+            $uploadModal.modal('hide');
+          }, 320);
+          showNotice(
+            queuedCount === 1
+              ? 'Upload received. Dyslibria has started converting your book.'
+              : `Upload received. Dyslibria has started converting ${queuedCount} books.`,
+            'success'
+          );
           refreshDashboard();
           loadLogs();
         },
         error: function (xhr) {
           const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Error uploading files';
+          setUploadProgressState({
+            percent: Math.max(Number($uploadProgressPercent.text().replace('%', '')) || 0, 0),
+            title: 'Upload did not finish',
+            copy: message,
+            meta: 'Review the message, adjust the batch if needed, and try again.',
+            tone: 'error'
+          });
           showNotice(message, 'error', {
             title: 'Upload could not start',
             timeout: 0
           });
+        },
+        complete: function () {
+          setUploadBusy(false);
         }
       });
     });
@@ -839,38 +1036,47 @@ $(document).ready(function () {
     $dropZone.on('dragover', function (event) {
       event.preventDefault();
       event.stopPropagation();
+
+      if (state.uploading) {
+        return;
+      }
       $(this).addClass('dragover');
     });
 
     $dropZone.on('dragleave', function (event) {
       event.preventDefault();
       event.stopPropagation();
+
+      if (state.uploading) {
+        return;
+      }
       $(this).removeClass('dragover');
     });
 
     $dropZone.on('drop', function (event) {
       event.preventDefault();
       event.stopPropagation();
+
+      if (state.uploading) {
+        return;
+      }
       $(this).removeClass('dragover');
 
       const files = event.originalEvent.dataTransfer.files;
       $fileInput.get(0).files = files;
-      $(this).text(files.length > 1 ? `${files.length} files selected` : files[0].name);
+      syncSelectedFilesUi();
     });
 
     $dropZone.on('click', function () {
+      if (state.uploading) {
+        return;
+      }
+
       $fileInput.trigger('click');
     });
 
     $fileInput.on('change', function () {
-      const files = $(this).get(0).files;
-
-      if (!files || files.length === 0) {
-        $dropZone.text('Drag EPUB files here or click to choose them');
-        return;
-      }
-
-      $dropZone.text(files.length > 1 ? `${files.length} files selected` : files[0].name);
+      syncSelectedFilesUi();
     });
 
     $cards.on('click', '.card-menu-toggle', function (event) {

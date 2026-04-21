@@ -11,6 +11,7 @@
     fontFamily: 'accessible',
     fontSize: 110,
     lineHeight: 1.6,
+    pageMargin: 6.5,
     layout: 'auto',
     flow: 'paginated'
   };
@@ -85,6 +86,8 @@
     fontSizeValue: document.getElementById('fontSizeValue'),
     lineHeightInput: document.getElementById('lineHeightInput'),
     lineHeightValue: document.getElementById('lineHeightValue'),
+    pageMarginInput: document.getElementById('pageMarginInput'),
+    pageMarginValue: document.getElementById('pageMarginValue'),
     layoutSelect: document.getElementById('layoutSelect'),
     flowSelect: document.getElementById('flowSelect')
   };
@@ -231,10 +234,12 @@
     elements.fontFamilySelect.value = settings.fontFamily;
     elements.fontSizeInput.value = settings.fontSize;
     elements.lineHeightInput.value = settings.lineHeight;
+    elements.pageMarginInput.value = settings.pageMargin;
     elements.layoutSelect.value = settings.layout;
     elements.flowSelect.value = settings.flow;
     elements.fontSizeValue.textContent = `${settings.fontSize}%`;
     elements.lineHeightValue.textContent = Number(settings.lineHeight).toFixed(1);
+    elements.pageMarginValue.textContent = `${Number(settings.pageMargin).toFixed(1)}%`;
   }
 
   async function loadAppConfig() {
@@ -593,6 +598,9 @@
         : ((appPalette && appPalette.linkLight) || baseTheme.link)
     };
     const fontFamily = fontFamilies[settings.fontFamily] || fontFamilies.accessible;
+    const pageMargin = Math.max(3, Math.min(12, Number(settings.pageMargin) || defaultSettings.pageMargin));
+    const verticalPageMargin = Math.max(2.5, Math.min(10, pageMargin - (window.innerWidth < 700 ? 0.2 : 0.8)));
+    const pagePadding = `${verticalPageMargin}% ${pageMargin}%`;
 
     rendition.themes.default({
       'html, body': {
@@ -611,7 +619,7 @@
         'font-weight': '400',
         'text-rendering': 'optimizeLegibility',
         margin: '0',
-        padding: window.innerWidth < 700 ? '7% 7.5%' : '5.5% 6.5%',
+        padding: pagePadding,
         '-webkit-user-select': 'none',
         '-moz-user-select': 'none',
         'user-select': 'none',
@@ -904,6 +912,13 @@
 
     elements.lineHeightInput.addEventListener('input', function () {
       settings.lineHeight = Number(this.value);
+      updateSettingLabels();
+      applyReaderSettings();
+      persistSettings();
+    });
+
+    elements.pageMarginInput.addEventListener('input', function () {
+      settings.pageMargin = Number(this.value);
       updateSettingLabels();
       applyReaderSettings();
       persistSettings();
