@@ -13,6 +13,10 @@
   <meta name="apple-mobile-web-app-title" content="Dyslibria">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Figtree:wght@400;600;700&family=IBM+Plex+Sans:wght@400;600;700&family=Lexend:wght@400;600;700&family=Literata:wght@400;600;700&family=Merriweather+Sans:wght@400;700&family=Noto+Sans:wght@400;700&family=Nunito+Sans:wght@400;700&family=Public+Sans:wght@400;600;700&family=Source+Sans+3:wght@400;600;700&family=Source+Serif+4:wght@400;600;700&display=swap">
   <link rel="stylesheet" type="text/css" href="semantic.min.css">
   <link rel="stylesheet" type="text/css" href="reader.css">
   <script defer src="jszip.min.js"></script>
@@ -35,7 +39,6 @@
 
       <section class="loading-card" id="loadingCard" aria-live="polite">
         <p class="eyebrow">Reading now</p>
-        <div class="reader-wordmark"><span class="brand-kicker">Dys</span>libria</div>
         <h1 id="loadingTitle">Opening book…</h1>
         <p class="reader-subtitle" id="loadingMeta">Preparing reader shell</p>
         <div class="loading-progress-row">
@@ -71,78 +74,81 @@
     </aside>
 
     <aside class="settings-panel" id="settingsPanel" aria-hidden="true">
-      <div class="panel-header">
+      <div class="panel-header settings-header">
         <div>
           <p class="eyebrow">Display</p>
-          <div class="reader-wordmark panel-wordmark"><span class="brand-kicker">Dys</span>libria</div>
-          <h1 id="bookTitle">Opening book…</h1>
-          <p class="reader-subtitle" id="bookMeta">Preparing reader shell</p>
+          <h1>Reader settings</h1>
+          <p class="reader-subtitle">Adjust typography and layout without flattening the book’s own design.</p>
         </div>
         <button class="text-button" id="closeSettings" type="button">Close</button>
       </div>
 
-      <div class="panel-actions">
-        <button class="ui button action-button hidden" id="installButton" type="button" hidden>Install app</button>
+      <div class="settings-layout">
+        <section class="settings-controls">
+          <div class="settings-grid">
+            <label class="setting-field">
+              <span>Reader theme</span>
+              <select id="themeSelect">
+                <option value="paper">Paper</option>
+                <option value="sepia">Sepia</option>
+                <option value="midnight">Midnight</option>
+              </select>
+            </label>
+
+            <label class="setting-field">
+              <span>Page spread</span>
+              <select id="layoutSelect">
+                <option value="auto">Auto</option>
+                <option value="always">Always show spreads</option>
+                <option value="none">Single page only</option>
+              </select>
+            </label>
+
+            <label class="setting-field">
+              <span>Font size <strong id="fontSizeValue">110%</strong></span>
+              <input id="fontSizeInput" type="range" min="90" max="160" step="5" value="110">
+            </label>
+
+            <label class="setting-field">
+              <span>Line height <strong id="lineHeightValue">1.6</strong></span>
+              <input id="lineHeightInput" type="range" min="1.3" max="2" step="0.1" value="1.6">
+            </label>
+
+            <label class="setting-field">
+              <span>Page margin <strong id="pageMarginValue">6.5%</strong></span>
+              <input id="pageMarginInput" type="range" min="3" max="12" step="0.5" value="6.5">
+            </label>
+
+            <label class="setting-field">
+              <span>Reading mode</span>
+              <select id="flowSelect">
+                <option value="paginated">Paginated</option>
+                <option value="scrolled-doc">Continuous scroll</option>
+              </select>
+            </label>
+
+            <div class="setting-field font-gallery-field">
+              <span>Font family</span>
+              <span class="setting-help">Each preview uses Dyslibria emphasis so readers can compare rhythm as well as shape.</span>
+              <div class="font-choice-grid" id="fontPresetGrid" aria-label="Font family choices"></div>
+            </div>
+
+            <section class="setting-field toggle-card">
+              <p class="toggle-intro">Why would you do this?</p>
+              <label class="toggle-field" for="disableDyslibriaInput">
+                <span class="toggle-copy">
+                  <span class="toggle-label">Turn off Dyslibria</span>
+                  <span class="setting-help">Keep the same book layout and colours, but remove Dyslibria’s front-of-word bolding while you read.</span>
+                </span>
+                <span class="toggle-switch">
+                  <input id="disableDyslibriaInput" class="toggle-input" type="checkbox" role="switch" aria-label="Turn off Dyslibria">
+                  <span class="toggle-slider" aria-hidden="true"></span>
+                </span>
+              </label>
+            </section>
+          </div>
+        </section>
       </div>
-
-      <div class="settings-grid">
-        <label class="setting-field">
-          <span>Theme</span>
-          <select id="themeSelect">
-            <option value="paper">Paper</option>
-            <option value="sepia">Sepia</option>
-            <option value="midnight">Midnight</option>
-          </select>
-        </label>
-
-        <label class="setting-field">
-          <span>Font family</span>
-          <select id="fontFamilySelect">
-            <option value="accessible">Accessible sans</option>
-            <option value="serif">Bookish serif</option>
-            <option value="classic">Classic sans</option>
-          </select>
-        </label>
-
-        <label class="setting-field">
-          <span>Font size <strong id="fontSizeValue">110%</strong></span>
-          <input id="fontSizeInput" type="range" min="90" max="160" step="5" value="110">
-        </label>
-
-        <label class="setting-field">
-          <span>Line height <strong id="lineHeightValue">1.6</strong></span>
-          <input id="lineHeightInput" type="range" min="1.3" max="2" step="0.1" value="1.6">
-        </label>
-
-        <label class="setting-field">
-          <span>Page margin <strong id="pageMarginValue">6.5%</strong></span>
-          <input id="pageMarginInput" type="range" min="3" max="12" step="0.5" value="6.5">
-        </label>
-
-        <label class="setting-field">
-          <span>Page spread</span>
-          <select id="layoutSelect">
-            <option value="auto">Auto</option>
-            <option value="always">Always show spreads</option>
-            <option value="none">Single page only</option>
-          </select>
-        </label>
-
-        <label class="setting-field">
-          <span>Reading mode</span>
-          <select id="flowSelect">
-            <option value="paginated">Paginated</option>
-            <option value="scrolled-doc">Continuous scroll</option>
-          </select>
-        </label>
-      </div>
-
-      <section class="toc-section">
-        <div class="section-heading">
-          <h2>Contents</h2>
-        </div>
-        <nav class="toc-tree" id="tocList" aria-label="Table of contents"></nav>
-      </section>
     </aside>
 
     <div class="reader-scrim" id="readerScrim"></div>

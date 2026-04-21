@@ -13,35 +13,108 @@
     lineHeight: 1.6,
     pageMargin: 6.5,
     layout: 'auto',
-    flow: 'paginated'
-  };
-
-  const pageThemes = {
-    paper: {
-      background: '#fffdf7',
-      color: '#1b1a18',
-      link: '#1f4d89'
-    },
-    sepia: {
-      background: '#fff7eb',
-      color: '#2a2018',
-      link: '#87542f'
-    },
-    midnight: {
-      background: '#1f2632',
-      color: '#eef3e8',
-      link: '#8fc6ff'
-    }
+    flow: 'paginated',
+    disableDyslibria: false
   };
 
   let appPalette = window.DyslibriaTheme
     ? window.DyslibriaTheme.applyPalette(window.DyslibriaTheme.DEFAULT_COLOR_KEY, document.documentElement)
     : null;
 
-  const fontFamilies = {
-    accessible: '"Avenir Next", "Segoe UI", "Trebuchet MS", sans-serif',
-    serif: '"Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif',
-    classic: '"Gill Sans", "Trebuchet MS", sans-serif'
+  const fontOptions = [
+    {
+      id: 'accessible',
+      name: 'Accessible Sans',
+      family: '"Avenir Next", "Segoe UI", "Trebuchet MS", sans-serif',
+      note: 'Familiar humanist system stack with steady shapes.',
+      preview: 'Calmer scanning with friendly familiar letterforms.'
+    },
+    {
+      id: 'atkinson',
+      name: 'Atkinson Hyperlegible',
+      family: '"Atkinson Hyperlegible", "Avenir Next", "Segoe UI", sans-serif',
+      note: 'Built for stronger character distinction and readability.',
+      preview: 'Clearer letters help keep fast lines from blurring.'
+    },
+    {
+      id: 'lexend',
+      name: 'Lexend',
+      family: '"Lexend", "Avenir Next", "Segoe UI", sans-serif',
+      note: 'Open spacing and smoother pacing for visual tracking.',
+      preview: 'Roomier word shapes can slow visual crowding down.'
+    },
+    {
+      id: 'sourceSans',
+      name: 'Source Sans 3',
+      family: '"Source Sans 3", "Segoe UI", sans-serif',
+      note: 'Balanced, low-noise sans for longer reading sessions.',
+      preview: 'A calmer page texture keeps focus on the sentence.'
+    },
+    {
+      id: 'publicSans',
+      name: 'Public Sans',
+      family: '"Public Sans", "Segoe UI", sans-serif',
+      note: 'Crisp proportions with a confident, sturdy rhythm.',
+      preview: 'Clean rhythm can make paragraphs feel less hectic.'
+    },
+    {
+      id: 'notoSans',
+      name: 'Noto Sans',
+      family: '"Noto Sans", "Segoe UI", sans-serif',
+      note: 'Consistent spacing with broad language coverage.',
+      preview: 'Steady spacing supports quieter, more even reading.'
+    },
+    {
+      id: 'ibmPlex',
+      name: 'IBM Plex Sans',
+      family: '"IBM Plex Sans", "Segoe UI", sans-serif',
+      note: 'Compact clarity for readers who like sharper structure.',
+      preview: 'Sharper contours can anchor attention on each line.'
+    },
+    {
+      id: 'nunito',
+      name: 'Nunito Sans',
+      family: '"Nunito Sans", "Segoe UI", sans-serif',
+      note: 'Rounded shapes for a softer, less rigid page feel.',
+      preview: 'Softer curves can make dense pages feel more gentle.'
+    },
+    {
+      id: 'merriweatherSans',
+      name: 'Merriweather Sans',
+      family: '"Merriweather Sans", "Trebuchet MS", sans-serif',
+      note: 'Open counters with a slightly more literary texture.',
+      preview: 'Readable warmth without losing structure or contrast.'
+    },
+    {
+      id: 'literata',
+      name: 'Literata',
+      family: '"Literata", "Iowan Old Style", "Palatino Linotype", Georgia, serif',
+      note: 'Thoughtful serif rhythm for readers who like a bookish page.',
+      preview: 'Gentle serif texture can make long reading feel grounded.'
+    },
+    {
+      id: 'sourceSerif',
+      name: 'Source Serif 4',
+      family: '"Source Serif 4", "Palatino Linotype", Georgia, serif',
+      note: 'Clear contemporary serif with strong structure and calm flow.',
+      preview: 'Sharper serifs can help word shapes feel more anchored.'
+    },
+    {
+      id: 'figtree',
+      name: 'Figtree',
+      family: '"Figtree", "Avenir Next", "Segoe UI", sans-serif',
+      note: 'Friendly modern shapes with clean, even word flow.',
+      preview: 'Smooth curves and tidy spacing can reduce fatigue.'
+    }
+  ];
+
+  const fontFamilies = Object.fromEntries(fontOptions.map(function (option) {
+    return [option.id, option.family];
+  }));
+
+  const legacyFontAliases = {
+    serif: 'literata',
+    classic: 'ibmPlex'
   };
 
   const zoneConfig = {
@@ -74,15 +147,11 @@
     closeSettings: document.getElementById('closeSettings'),
     scrim: document.getElementById('readerScrim'),
     viewer: document.getElementById('viewer'),
-    bookTitle: document.getElementById('bookTitle'),
-    bookMeta: document.getElementById('bookMeta'),
-    tocList: document.getElementById('tocList'),
     progressLabel: document.getElementById('progressLabel'),
     chapterLabel: document.getElementById('chapterLabel'),
     progressFill: document.getElementById('progressFill'),
-    installButton: document.getElementById('installButton'),
     themeSelect: document.getElementById('themeSelect'),
-    fontFamilySelect: document.getElementById('fontFamilySelect'),
+    fontPresetGrid: document.getElementById('fontPresetGrid'),
     fontSizeInput: document.getElementById('fontSizeInput'),
     fontSizeValue: document.getElementById('fontSizeValue'),
     lineHeightInput: document.getElementById('lineHeightInput'),
@@ -90,7 +159,8 @@
     pageMarginInput: document.getElementById('pageMarginInput'),
     pageMarginValue: document.getElementById('pageMarginValue'),
     layoutSelect: document.getElementById('layoutSelect'),
-    flowSelect: document.getElementById('flowSelect')
+    flowSelect: document.getElementById('flowSelect'),
+    disableDyslibriaInput: document.getElementById('disableDyslibriaInput')
   };
 
   const uiState = {
@@ -130,11 +200,86 @@
     }
   }
 
-  const settings = parseStoredJson(SETTINGS_STORAGE_KEY, defaultSettings);
-
-  if (window.DyslibriaPwa) {
-    window.DyslibriaPwa.bindInstallButton(elements.installButton);
+  function normalizeFontFamilyKey(value) {
+    const normalizedValue = String(value || '').trim();
+    const nextValue = legacyFontAliases[normalizedValue] || normalizedValue;
+    return fontFamilies[nextValue] ? nextValue : defaultSettings.fontFamily;
   }
+
+  function escapeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function createDyslibriaMarkup(text) {
+    const wordPattern = /([A-Za-z][A-Za-z'-]*)/g;
+    let output = '';
+    let lastIndex = 0;
+    let match = null;
+
+    while ((match = wordPattern.exec(text)) !== null) {
+      output += escapeHtml(text.slice(lastIndex, match.index));
+
+      const word = match[0];
+      const boldLength = Math.max(1, Math.ceil(word.length / 2));
+      output += `<b>${escapeHtml(word.slice(0, boldLength))}</b>${escapeHtml(word.slice(boldLength))}`;
+      lastIndex = match.index + word.length;
+    }
+
+    output += escapeHtml(text.slice(lastIndex));
+    return output;
+  }
+
+  function updateFontChoiceSelection() {
+    if (!elements.fontPresetGrid) {
+      return;
+    }
+
+    elements.fontPresetGrid.querySelectorAll('.font-choice').forEach(function (button) {
+      const isActive = button.dataset.fontId === settings.fontFamily;
+      button.classList.toggle('is-active', isActive);
+      button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+  }
+
+  function renderFontChoices() {
+    if (!elements.fontPresetGrid) {
+      return;
+    }
+
+    elements.fontPresetGrid.innerHTML = '';
+
+    fontOptions.forEach(function (option) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'font-choice';
+      button.dataset.fontId = option.id;
+      button.style.fontFamily = option.family;
+      button.setAttribute('aria-label', option.name);
+      button.innerHTML = `
+        <span class="font-choice-name">${createDyslibriaMarkup(option.name)}</span>
+        <span class="font-choice-preview">${createDyslibriaMarkup(option.preview)}</span>
+        <span class="font-choice-note">${escapeHtml(option.note)}</span>
+      `;
+      button.addEventListener('click', function () {
+        settings.fontFamily = option.id;
+        updateFontChoiceSelection();
+        applyReaderSettings();
+        persistSettings();
+      });
+      elements.fontPresetGrid.appendChild(button);
+    });
+
+    updateFontChoiceSelection();
+  }
+
+  const settings = parseStoredJson(SETTINGS_STORAGE_KEY, defaultSettings);
+  settings.fontFamily = normalizeFontFamilyKey(settings.fontFamily);
+  settings.disableDyslibria = Boolean(settings.disableDyslibria);
 
   function persistSettings() {
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
@@ -232,15 +377,16 @@
 
   function updateSettingLabels() {
     elements.themeSelect.value = settings.theme;
-    elements.fontFamilySelect.value = settings.fontFamily;
     elements.fontSizeInput.value = settings.fontSize;
     elements.lineHeightInput.value = settings.lineHeight;
     elements.pageMarginInput.value = settings.pageMargin;
     elements.layoutSelect.value = settings.layout;
     elements.flowSelect.value = settings.flow;
+    elements.disableDyslibriaInput.checked = settings.disableDyslibria;
     elements.fontSizeValue.textContent = `${settings.fontSize}%`;
     elements.lineHeightValue.textContent = Number(settings.lineHeight).toFixed(1);
     elements.pageMarginValue.textContent = `${Number(settings.pageMargin).toFixed(1)}%`;
+    updateFontChoiceSelection();
   }
 
   async function loadAppConfig() {
@@ -474,18 +620,10 @@
     rendition.prev();
   }
 
-  function handleSurfaceInteraction(event, contents) {
-    if (!contents || !contents.window || uiState.overlay) {
-      return;
-    }
-
-    if (isInteractiveTarget(event.target)) {
-      return;
-    }
-
+  function shouldIgnoreSurfaceEvent(event) {
     const now = Date.now();
     if (event.type === 'click' && now - uiState.lastTouchEventAt < 700) {
-      return;
+      return true;
     }
 
     if (event.type === 'touchend') {
@@ -493,10 +631,14 @@
     }
 
     if (now - uiState.lastSurfaceActionAt < 250) {
-      return;
+      return true;
     }
 
-    const point = getPointerClientPoint(event, contents);
+    uiState.lastSurfaceActionAt = now;
+    return false;
+  }
+
+  function handleViewportZoneAction(point, event) {
     const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
 
@@ -506,7 +648,6 @@
 
     const xRatio = point.x / viewportWidth;
     const yRatio = point.y / viewportHeight;
-    uiState.lastSurfaceActionAt = now;
 
     if (typeof event.preventDefault === 'function') {
       event.preventDefault();
@@ -539,6 +680,51 @@
     if (xRatio >= zoneConfig.nextMinX) {
       goNext();
     }
+  }
+
+  function handleSurfaceInteraction(event, contents) {
+    if (!contents || !contents.window || uiState.overlay) {
+      return;
+    }
+
+    if (isInteractiveTarget(event.target)) {
+      return;
+    }
+
+    if (shouldIgnoreSurfaceEvent(event)) {
+      return;
+    }
+
+    const point = getPointerClientPoint(event, contents);
+    if (!point) {
+      return;
+    }
+
+    handleViewportZoneAction(point, event);
+  }
+
+  function handleShellSurfaceInteraction(event) {
+    if (uiState.overlay || !elements.viewerFrame || !elements.viewerFrame.contains(event.target)) {
+      return;
+    }
+
+    if (
+      event.target !== elements.viewerFrame &&
+      event.target !== elements.viewer
+    ) {
+      return;
+    }
+
+    if (shouldIgnoreSurfaceEvent(event)) {
+      return;
+    }
+
+    const point = getPointerClientPoint(event, null);
+    if (!point) {
+      return;
+    }
+
+    handleViewportZoneAction(point, event);
   }
 
   function lockContentSelection(contents) {
@@ -591,6 +777,50 @@
     });
   }
 
+  function buildContentPresentationStyles() {
+    if (!settings.disableDyslibria) {
+      return '';
+    }
+
+    return `
+      b {
+        font-weight: inherit !important;
+      }
+    `;
+  }
+
+  function applyContentPresentationOverrides(contents) {
+    if (!contents || !contents.document) {
+      return;
+    }
+
+    const doc = contents.document;
+    let styleTag = doc.getElementById('dyslibriaContentOverrides');
+
+    if (!styleTag) {
+      styleTag = doc.createElement('style');
+      styleTag.id = 'dyslibriaContentOverrides';
+
+      if (doc.head) {
+        doc.head.appendChild(styleTag);
+      } else if (doc.documentElement) {
+        doc.documentElement.appendChild(styleTag);
+      }
+    }
+
+    styleTag.textContent = buildContentPresentationStyles();
+  }
+
+  function updateOpenContentPresentationOverrides() {
+    if (!rendition || typeof rendition.getContents !== 'function') {
+      return;
+    }
+
+    rendition.getContents().forEach(function (contents) {
+      applyContentPresentationOverrides(contents);
+    });
+  }
+
   async function fetchEpubBuffer(filename) {
     const response = await fetch(`/epub/${encodeURIComponent(filename)}`, {
       credentials: 'same-origin',
@@ -611,69 +841,37 @@
       return;
     }
 
-    const baseTheme = pageThemes[settings.theme] || pageThemes.paper;
-    const theme = {
-      ...baseTheme,
-      link: settings.theme === 'midnight'
-        ? ((appPalette && appPalette.linkDark) || baseTheme.link)
-        : ((appPalette && appPalette.linkLight) || baseTheme.link)
-    };
     const fontFamily = fontFamilies[settings.fontFamily] || fontFamilies.accessible;
-
-    applyViewerMargins();
-
-    rendition.themes.default({
-      'html, body': {
-        'background-color': theme.background,
-        color: theme.color,
-        '-webkit-user-select': 'none',
-        '-moz-user-select': 'none',
-        'user-select': 'none',
-        '-webkit-touch-callout': 'none'
+    const themeRules = {
+      html: {
+        '-webkit-text-size-adjust': '100%',
+        'text-size-adjust': '100%'
       },
       body: {
-        'background-color': theme.background,
-        color: theme.color,
         'font-family': fontFamily,
         'line-height': String(settings.lineHeight),
-        'font-weight': '400',
-        'text-rendering': 'optimizeLegibility',
-        margin: '0',
-        padding: '0',
-        '-webkit-user-select': 'none',
-        '-moz-user-select': 'none',
-        'user-select': 'none',
-        '-webkit-touch-callout': 'none'
+        'text-rendering': 'optimizeLegibility'
       },
-      '*': {
-        '-webkit-user-select': 'none',
-        '-moz-user-select': 'none',
-        'user-select': 'none',
-        '-webkit-touch-callout': 'none'
-      },
-      p: {
-        'line-height': String(settings.lineHeight),
-        margin: '0 0 1em'
-      },
-      'b, strong, b *, strong *': {
-        'font-weight': '700 !important',
-        color: theme.color
-      },
-      'h1, h2, h3, h4, h5, h6': {
-        color: theme.color
-      },
-      'img, svg': {
+      'img, svg, video, canvas': {
         'max-width': '100%',
         height: 'auto'
       },
-      a: {
-        color: theme.link
+      'figure, picture': {
+        'max-width': '100%'
       }
-    });
+    };
+
+    applyViewerMargins();
+
+    // Keep reader overrides ergonomic rather than editorial. The reader should
+    // manage typography, sizing, and fit, while the book keeps its own colours,
+    // emphasis, spacing, links, and general visual personality.
+    rendition.themes.default(themeRules);
 
     rendition.themes.fontSize(`${settings.fontSize}%`);
     rendition.flow(settings.flow);
     rendition.spread(getDisplaySpread());
+    updateOpenContentPresentationOverrides();
     resizeRendition();
   }
 
@@ -681,8 +879,6 @@
     const safeTitle = title || fileName || 'Untitled book';
     const safeAuthor = author || 'Unknown author';
 
-    elements.bookTitle.textContent = safeTitle;
-    elements.bookMeta.textContent = safeAuthor;
     elements.progressTitle.textContent = safeTitle;
     elements.progressMeta.textContent = safeAuthor;
     setLoadingState(safeTitle, safeAuthor);
@@ -706,68 +902,12 @@
     });
   }
 
-  function buildTocList(items, isRoot) {
-    const list = document.createElement('ul');
-    list.className = isRoot ? 'toc-list' : 'toc-sublist';
-
-    items.forEach(function (item) {
-      const listItem = document.createElement('li');
-      const button = document.createElement('button');
-      const href = item.href || '';
-      const children = item.subitems || item.children || [];
-
-      button.type = 'button';
-      button.className = 'toc-link';
-      button.textContent = item.label || 'Untitled chapter';
-      button.dataset.href = normalizeHref(href);
-      button.addEventListener('click', function () {
-        if (!rendition) {
-          return;
-        }
-
-        rendition.display(href);
-        closeOverlay();
-      });
-
-      listItem.appendChild(button);
-
-      if (children.length > 0) {
-        listItem.appendChild(buildTocList(children, false));
-      }
-
-      list.appendChild(listItem);
-    });
-
-    return list;
-  }
-
-  function renderTocList(items) {
-    elements.tocList.innerHTML = '';
-    elements.tocList.appendChild(buildTocList(items, true));
-  }
-
   function formatPageLabel(pageNumber, totalPages) {
     if (!Number.isFinite(pageNumber) || !Number.isFinite(totalPages) || pageNumber <= 0 || totalPages <= 0) {
       return '';
     }
 
     return `Page ${pageNumber} of ${totalPages}`;
-  }
-
-  function setActiveTocEntry(currentHref) {
-    const normalizedCurrentHref = normalizeHref(currentHref);
-    const tocButtons = elements.tocList.querySelectorAll('.toc-link');
-
-    tocButtons.forEach(function (button) {
-      const buttonHref = button.dataset.href || '';
-      const matches = normalizedCurrentHref && (
-        normalizedCurrentHref === buttonHref ||
-        normalizedCurrentHref.startsWith(buttonHref) ||
-        buttonHref.startsWith(normalizedCurrentHref)
-      );
-
-      button.classList.toggle('is-active', matches);
-    });
   }
 
   function updateProgress(location) {
@@ -837,7 +977,6 @@
     elements.progressDetail.textContent = pageLabel
       ? `${pageLabel}. Reading progress saves on the server automatically.`
       : 'Reading progress saves on the server automatically.';
-    setActiveTocEntry(activeHref);
 
     if (latestProgress.location) {
       persistLocalLocation(latestProgress.location);
@@ -917,12 +1056,6 @@
       persistSettings();
     });
 
-    elements.fontFamilySelect.addEventListener('change', function () {
-      settings.fontFamily = this.value;
-      applyReaderSettings();
-      persistSettings();
-    });
-
     elements.fontSizeInput.addEventListener('input', function () {
       settings.fontSize = Number(this.value);
       updateSettingLabels();
@@ -956,9 +1089,18 @@
       persistSettings();
     });
 
+    elements.disableDyslibriaInput.addEventListener('change', function () {
+      settings.disableDyslibria = this.checked;
+      applyReaderSettings();
+      persistSettings();
+    });
+
     window.addEventListener('resize', function () {
       applyReaderSettings();
     });
+
+    elements.viewerFrame.addEventListener('click', handleShellSurfaceInteraction);
+    elements.viewerFrame.addEventListener('touchend', handleShellSurfaceInteraction, { passive: false });
 
     window.addEventListener('popstate', function () {
       if (uiState.overlay && uiState.overlayHistoryActive) {
@@ -979,6 +1121,7 @@
     }
 
     await loadAppConfig();
+    renderFontChoices();
     updateSettingLabels();
     applyShellTheme();
     applyViewerMargins();
@@ -1000,6 +1143,7 @@
       if (rendition.hooks && rendition.hooks.content) {
         rendition.hooks.content.register(function (contents) {
           lockContentSelection(contents);
+          applyContentPresentationOverrides(contents);
         });
       }
 
@@ -1024,7 +1168,6 @@
       const tocEntries = Array.isArray(navigation) ? navigation : (navigation.toc || []);
       flatTocEntries = [];
       flattenTocEntries(tocEntries, flatTocEntries);
-      renderTocList(tocEntries);
 
       try {
         setLoadingProgress(76, 'Building page map');

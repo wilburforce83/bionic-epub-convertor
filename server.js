@@ -27,6 +27,7 @@ const {
   listLibraryBookFilenames,
   removeReadingProgressForUserAndFilename
 } = require('./utils/libraryMaintenance');
+const { listUploadBookPaths } = require('./utils/uploadDiscovery');
 const { createUserStore, DEFAULT_BOOTSTRAP_USERNAME, DEFAULT_BOOTSTRAP_PASSWORD } = require('./utils/userStore');
 const { compareSemver, pickLatestSemver } = require('./utils/versionUtils');
 const packageMetadata = require('./package.json');
@@ -893,6 +894,31 @@ function startUploadsWatcher() {
   });
 }
 
+async function queueExistingUploads() {
+  const existingUploadPaths = await listUploadBookPaths(uploadsDir);
+  let recoveredCount = 0;
+
+  for (const uploadPath of existingUploadPaths) {
+    const outputFilename = await allocateOutputFilename(path.basename(uploadPath));
+    const didQueue = enqueueFile({
+      id: uuidv4(),
+      uploadPath,
+      outputFilename
+    });
+
+    if (didQueue) {
+      recoveredCount += 1;
+    }
+  }
+
+  if (recoveredCount > 0) {
+    appendConversionLog(
+      'info',
+      `Recovered ${recoveredCount} pending upload${recoveredCount === 1 ? '' : 's'} from the uploads folder on startup.`
+    );
+  }
+}
+
 function getBaseUrl(req) {
   return configuredBaseUrl || `${req.protocol}://${req.get('host')}`;
 }
@@ -1683,6 +1709,12 @@ async function startApplication() {
   await ensureDirectoriesExist();
   await extractEpubData(processedDir);
   startUploadsWatcher();
+  try {
+    await queueExistingUploads();
+  } catch (error) {
+    console.error('Error scanning uploads on startup:', error);
+    appendConversionLog('error', `Startup upload scan failed: ${error.message}`);
+  }
 
   app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
