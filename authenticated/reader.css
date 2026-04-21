@@ -59,6 +59,15 @@ input {
   height: 100%;
 }
 
+.reader-stage,
+.viewer-frame,
+#viewer {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
 .viewer-frame {
   overflow: hidden;
   background: var(--reader-page-bg);

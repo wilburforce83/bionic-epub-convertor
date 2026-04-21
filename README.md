@@ -1,69 +1,112 @@
 # Dyslibria
 
-Dyslibria is a self-hosted EPUB conversion, library, and browser reading app built around a bionic-style reading transform. Upload EPUB files, convert them into Dyslibria format, read them in the web UI, or access the processed library over OPDS and WebDAV.
+Dyslibria is an open source, self-hosted EPUB library for people who want reading to feel calmer, clearer, and easier to come back to.
 
-## What It Does
+It combines three things in one container:
 
-- Converts uploaded EPUB files into Dyslibria's bionic-style reading format
-- Stores a processed library for browser reading, OPDS clients, and WebDAV access
-- Includes a responsive reader for desktop, tablet, mobile, and installed PWA use
-- Saves reading progress on the server so books reopen at the last location
-- Quarantines failed conversions instead of silently publishing broken books
+- an upload and conversion pipeline for EPUB files
+- a browser reading app with saved reading progress
+- OPDS and WebDAV access for external readers and library tools
 
-## Quick Start
+You can run it on a home server, NAS, VPS, mini PC, or a small classroom/community setup. The aim is simple: keep your books, your reading progress, and your access under your control.
 
-The recommended path is Docker.
+## What Dyslibria Includes
+
+- EPUB upload and processing
+- self-hosted browser reader for desktop, tablet, and phone
+- server-side saved reading position so books reopen where you left off
+- OPDS feed for compatible reading apps
+- WebDAV access to the processed library
+- quarantine for failed conversions instead of silently publishing broken files
+- Docker-first deployment with persistent storage
+
+## Quick Start With Docker Compose
+
+The included Compose file pulls the published image from Docker Hub:
+
+- `wilburforce83/dyslibria:latest`
+
+Start it with:
 
 ```bash
 git clone https://github.com/wilburforce83/bionic-epub-convertor.git
 cd bionic-epub-convertor
+docker compose pull
 docker compose up -d
 ```
-
-The included Compose file pulls the published image:
-
-- `wilburforce83/dyslibria:latest`
 
 Then open:
 
 - Web app: `http://localhost:3000`
+- OPDS feed: `http://localhost:3000/opds`
 - WebDAV: `http://localhost:1900`
-- OPDS: `http://localhost:3000/opds`
 
-On the first launch:
+## First Login
 
-- sign in with `admin` / `dyslibria`
-- create the permanent administrator account in the setup screen
-- after setup, the bootstrap login stops working
+On a fresh install, sign in with:
 
-An `.env` file is optional now. Dyslibria can run with its built-in defaults, and Docker Compose uses named volumes automatically.
+- username: `admin`
+- password: `dyslibria`
 
-## Documentation
+Dyslibria will then prompt you to create the permanent administrator account. After that bootstrap step, the default login stops working.
 
-- [Installation Guide](docs/INSTALL.md)
-- [Usage Guide](docs/USAGE.md)
-- [Maintainer Release Guide](docs/RELEASE.md)
+## Persistent Storage
 
-## Main Data Folders
+The default `docker-compose.yml` persists these paths:
 
-- `uploads/`: staged incoming EPUB files
-- `processed/`: the live processed library
-- `db/`: settings, metadata cache, and reading-progress data
-- `failed/`: quarantined files that failed validation or conversion
-- `temp/`: temporary processing files only, not intended for persistence
+- `/usr/src/app/uploads`
+- `/usr/src/app/processed`
+- `/usr/src/app/db`
+- `/usr/src/app/failed`
+
+That means your settings, uploaded files, processed library, and reading progress survive image updates.
+
+## Updating Dyslibria
+
+If you are running the included Compose setup:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+If you want to pin a release instead of tracking `latest`, set:
+
+```env
+IMAGE_TAG=1.0.5
+```
+
+and then run:
+
+```bash
+docker compose pull
+docker compose up -d
+```
 
 ## Health Check
 
-The app exposes:
+Dyslibria exposes:
 
 - `GET /healthz`
 
-This returns basic service state including queue length, processing state, and metadata readiness.
+It reports whether the app is up, whether processing is active, whether anything is queued, and whether metadata is ready.
+
+## Documentation
+
+- [Install guide](docs/INSTALL.md)
+- [Usage guide](docs/USAGE.md)
+- [Release guide](docs/RELEASE.md)
 
 ## Local Development
 
-If you want to run it directly with Node instead of Docker, see the source install section in [docs/INSTALL.md](docs/INSTALL.md).
+If you want to run from source instead of Docker, see the source install section in [docs/INSTALL.md](docs/INSTALL.md).
+
+## Docker Hub
+
+Published images live at:
+
+- `https://hub.docker.com/r/wilburforce83/dyslibria`
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE.md](LICENSE.md).
+This project is licensed under the MIT License.

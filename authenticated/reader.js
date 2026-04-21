@@ -515,6 +515,56 @@
     }
   }
 
+  function lockContentSelection(contents) {
+    if (!contents || !contents.document) {
+      return;
+    }
+
+    const doc = contents.document;
+    const root = doc.documentElement;
+
+    if (root && root.dataset.dyslibriaSelectionLocked === 'true') {
+      return;
+    }
+
+    if (root) {
+      root.dataset.dyslibriaSelectionLocked = 'true';
+    }
+
+    const styleTag = doc.createElement('style');
+    styleTag.textContent = `
+      html,
+      body,
+      body * {
+        -webkit-user-select: none !important;
+        -moz-user-select: none !important;
+        user-select: none !important;
+        -webkit-touch-callout: none !important;
+      }
+
+      * {
+        -webkit-tap-highlight-color: transparent !important;
+      }
+    `;
+
+    if (doc.head) {
+      doc.head.appendChild(styleTag);
+    } else if (doc.documentElement) {
+      doc.documentElement.appendChild(styleTag);
+    }
+
+    doc.addEventListener('selectstart', function (event) {
+      event.preventDefault();
+    });
+
+    doc.addEventListener('selectionchange', function () {
+      const selection = doc.getSelection && doc.getSelection();
+      if (selection && !selection.isCollapsed) {
+        selection.removeAllRanges();
+      }
+    });
+  }
+
   async function fetchEpubBuffer(filename) {
     const response = await fetch(`/epub/${encodeURIComponent(filename)}`, {
       credentials: 'same-origin',
@@ -547,7 +597,11 @@
     rendition.themes.default({
       'html, body': {
         'background-color': theme.background,
-        color: theme.color
+        color: theme.color,
+        '-webkit-user-select': 'none',
+        '-moz-user-select': 'none',
+        'user-select': 'none',
+        '-webkit-touch-callout': 'none'
       },
       body: {
         'background-color': theme.background,
@@ -557,7 +611,17 @@
         'font-weight': '400',
         'text-rendering': 'optimizeLegibility',
         margin: '0',
-        padding: window.innerWidth < 700 ? '7% 7.5%' : '5.5% 6.5%'
+        padding: window.innerWidth < 700 ? '7% 7.5%' : '5.5% 6.5%',
+        '-webkit-user-select': 'none',
+        '-moz-user-select': 'none',
+        'user-select': 'none',
+        '-webkit-touch-callout': 'none'
+      },
+      '*': {
+        '-webkit-user-select': 'none',
+        '-moz-user-select': 'none',
+        'user-select': 'none',
+        '-webkit-touch-callout': 'none'
       },
       p: {
         'line-height': String(settings.lineHeight),
@@ -896,6 +960,12 @@
         height: '100%',
         spread: getDisplaySpread()
       });
+
+      if (rendition.hooks && rendition.hooks.content) {
+        rendition.hooks.content.register(function (contents) {
+          lockContentSelection(contents);
+        });
+      }
 
       applyReaderSettings();
 
