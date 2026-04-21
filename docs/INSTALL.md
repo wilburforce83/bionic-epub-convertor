@@ -101,7 +101,7 @@ Useful optional values:
 MAIN_PORT=3000
 WEBDAV_PORT=1900
 BASE_URL=https://books.example.com
-IMAGE_TAG=1.0.0
+IMAGE_TAG=1.0.6
 SESSION_SECRET=replace-with-a-long-random-string
 ```
 
@@ -184,6 +184,8 @@ cd bionic-epub-convertor
 ```bash
 npm install
 ```
+
+That install also pulls the pinned `dyslibria-converter` package version that powers Dyslibria's EPUB conversion pipeline.
 
 ### 3. Create `.env`
 

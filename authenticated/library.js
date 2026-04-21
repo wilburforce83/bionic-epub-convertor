@@ -1,6 +1,9 @@
 $(document).ready(function () {
   const THEME_STORAGE_KEY = 'dyslibria:library-theme:v1';
   const BANNER_STORAGE_KEY = 'dyslibria:library-banner-collapsed:v1';
+  const LIBRARY_CACHE_KEY = 'dyslibria:library-cache:v1';
+  const LIBRARY_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+  const LIBRARY_RENDER_BATCH_SIZE = 24;
   const TIPS = [
     {
       title: 'Reader zones',
@@ -42,7 +45,10 @@ $(document).ready(function () {
     pendingPostConversionRefresh: false,
     autoRefreshInFlight: false,
     pendingBookAction: null,
-    noticeTimer: null
+    noticeTimer: null,
+    libraryLoading: true,
+    usingCachedLibrary: false,
+    renderPassId: 0
   };
 
   const $app = $('#libraryApp');
@@ -58,6 +64,9 @@ $(document).ready(function () {
   const $heroToggle = $('#heroToggle');
   const $heroToggleIcon = $('#heroToggleIcon');
   const $heroToggleLabel = $('#heroToggleLabel');
+  const $libraryLoading = $('#libraryLoading');
+  const $libraryLoadingTitle = $('#libraryLoadingTitle');
+  const $libraryLoadingText = $('#libraryLoadingText');
   const $searchBar = $('#searchBar');
   const $dropZone = $('#dropZone');
   const $fileInput = $('#epubFiles');
@@ -156,6 +165,120 @@ $(document).ready(function () {
       .replace(/>/g, '&gt;');
   }
 
+  function buildBookCoverUrl(book) {
+    const filename = String(book && book.filename || '');
+    if (!filename) {
+      return '';
+    }
+
+    const version = encodeURIComponent(String(book && book.lastModified || ''));
+    return `/api/books/${encodeURIComponent(filename)}/cover${version ? `?v=${version}` : ''}`;
+  }
+
+  function normalizeBook(book) {
+    const entry = book && typeof book === 'object' ? book : {};
+
+    return {
+      filename: entry.filename || '',
+      title: entry.title || '',
+      author: entry.author || '',
+      lastModified: entry.lastModified || '',
+      isValid: entry.isValid !== false,
+      processingError: entry.processingError || '',
+      coverUrl: entry.coverUrl || buildBookCoverUrl(entry)
+    };
+  }
+
+  function persistLibrarySnapshot(books) {
+    try {
+      const payload = {
+        cachedAt: Date.now(),
+        books: books.map(normalizeBook)
+      };
+
+      localStorage.setItem(LIBRARY_CACHE_KEY, JSON.stringify(payload));
+    } catch (error) {
+      // Ignore cache write failures so library rendering still succeeds.
+    }
+  }
+
+  function readLibrarySnapshot() {
+    try {
+      const rawValue = localStorage.getItem(LIBRARY_CACHE_KEY);
+      if (!rawValue) {
+        return [];
+      }
+
+      const payload = JSON.parse(rawValue);
+      const cachedAt = Number(payload && payload.cachedAt);
+      const books = Array.isArray(payload && payload.books) ? payload.books : [];
+
+      if (!cachedAt || (Date.now() - cachedAt) > LIBRARY_CACHE_MAX_AGE_MS) {
+        try {
+          localStorage.removeItem(LIBRARY_CACHE_KEY);
+        } catch (storageError) {
+          // Ignore storage cleanup failures.
+        }
+        return [];
+      }
+
+      return books
+        .map(normalizeBook)
+        .filter(function (book) {
+          return Boolean(book.filename);
+        });
+    } catch (error) {
+      try {
+        localStorage.removeItem(LIBRARY_CACHE_KEY);
+      } catch (storageError) {
+        // Ignore storage cleanup failures.
+      }
+      return [];
+    }
+  }
+
+  function setLibraryLoadingState(loading, options) {
+    const config = options || {};
+    const hasVisibleBooks = state.books.length > 0;
+
+    state.libraryLoading = Boolean(loading);
+
+    if (!state.libraryLoading) {
+      $libraryLoading.removeClass('is-active is-compact');
+      return;
+    }
+
+    $libraryLoadingTitle.text(config.title || (hasVisibleBooks ? 'Refreshing your library' : 'Loading your library'));
+    $libraryLoadingText.text(
+      config.text || (
+        hasVisibleBooks
+          ? 'Checking the server for the latest library changes.'
+          : 'Gathering your books and preparing the shelf.'
+      )
+    );
+    $libraryLoading
+      .addClass('is-active')
+      .toggleClass('is-compact', hasVisibleBooks);
+  }
+
+  function getLibraryMetaCopy(visibleCount, totalCount) {
+    if (state.libraryLoading && totalCount > 0) {
+      return state.usingCachedLibrary
+        ? 'Showing your saved shelf while Dyslibria checks the server for updates.'
+        : 'Refreshing your shelf with the latest changes.';
+    }
+
+    if (state.usingCachedLibrary && totalCount > 0) {
+      return 'Showing your last saved shelf.';
+    }
+
+    if (state.query && visibleCount !== totalCount) {
+      return `${totalCount - visibleCount} hidden by the current search.`;
+    }
+
+    return '';
+  }
+
   function buildReaderUrl(progress) {
     const params = new URLSearchParams({
       file: progress.filename
@@ -251,7 +374,7 @@ $(document).ready(function () {
       : `${visibleCount}`;
 
     $count.text(`${prefix} ${suffix}`);
-    $libraryMeta.text('');
+    $libraryMeta.text(getLibraryMetaCopy(visibleCount, totalCount));
   }
 
   function getFilteredBooks() {
@@ -284,9 +407,12 @@ $(document).ready(function () {
       .append($('<i>').addClass('ellipsis vertical icon').attr('aria-hidden', 'true'));
     const $menu = $('<div>').addClass('card-menu').prop('hidden', true);
     const $image = $('<img>')
-      .attr('src', book.cover || '')
-      .attr('alt', `${titleText || 'Book'} cover`)
-      .attr('loading', 'lazy');
+      .attr({
+        src: book.coverUrl || '',
+        alt: `${titleText || 'Book'} cover`,
+        loading: 'lazy',
+        decoding: 'async'
+      });
     const $body = $('<div>').addClass('card-body');
     const $title = $('<h2>').addClass('card-title').text(titleText);
     const $author = $('<p>').addClass('card-author').text(book.author || 'Unknown author');
@@ -342,15 +468,50 @@ $(document).ready(function () {
 
   function renderBooks() {
     const filteredBooks = getFilteredBooks();
+    const renderPassId = state.renderPassId + 1;
+    const deferred = $.Deferred();
+
+    state.renderPassId = renderPassId;
     closeCardMenus();
     $cards.empty();
-
-    filteredBooks.forEach(function (book) {
-      $cards.append(createCard(book));
-    });
+    $emptyState.prop('hidden', true);
 
     updateCountLabel(filteredBooks.length, state.books.length);
-    $emptyState.prop('hidden', filteredBooks.length > 0);
+
+    if (!filteredBooks.length) {
+      $emptyState.prop('hidden', state.libraryLoading);
+      deferred.resolve();
+      return deferred.promise();
+    }
+
+    const gridElement = $cards.get(0);
+    let index = 0;
+
+    function appendChunk() {
+      if (renderPassId !== state.renderPassId) {
+        deferred.resolve();
+        return;
+      }
+
+      const fragment = document.createDocumentFragment();
+      const chunkLimit = Math.min(index + LIBRARY_RENDER_BATCH_SIZE, filteredBooks.length);
+
+      for (; index < chunkLimit; index += 1) {
+        fragment.appendChild(createCard(filteredBooks[index]).get(0));
+      }
+
+      gridElement.appendChild(fragment);
+
+      if (index < filteredBooks.length) {
+        window.requestAnimationFrame(appendChunk);
+        return;
+      }
+
+      deferred.resolve();
+    }
+
+    appendChunk();
+    return deferred.promise();
   }
 
   function renderTip() {
@@ -498,10 +659,69 @@ $(document).ready(function () {
     $menuToggle.attr('aria-expanded', 'false');
   }
 
+  function hydrateLibraryFromCache() {
+    const cachedBooks = readLibrarySnapshot();
+    if (!cachedBooks.length) {
+      setLibraryLoadingState(true, {
+        title: 'Loading your library',
+        text: 'Gathering your books and preparing the shelf.'
+      });
+      return false;
+    }
+
+    state.books = cachedBooks;
+    state.usingCachedLibrary = true;
+    renderBooks();
+    setLibraryLoadingState(true, {
+      title: 'Refreshing your library',
+      text: 'Showing your saved shelf while Dyslibria checks the server for updates.'
+    });
+    return true;
+  }
+
   function loadBooks() {
+    if (!state.books.length) {
+      setLibraryLoadingState(true, {
+        title: 'Loading your library',
+        text: 'Gathering your books and preparing the shelf.'
+      });
+    } else {
+      setLibraryLoadingState(true, {
+        title: 'Refreshing your library',
+        text: state.usingCachedLibrary
+          ? 'Showing your saved shelf while Dyslibria checks the server for updates.'
+          : 'Checking the server for the latest library changes.'
+      });
+    }
+
     return $.get('/epubs').then(function (books) {
-      state.books = Array.isArray(books) ? books : [];
-      renderBooks();
+      const normalizedBooks = Array.isArray(books) ? books.map(normalizeBook) : [];
+      state.books = normalizedBooks.filter(function (book) {
+        return Boolean(book.filename);
+      });
+      state.usingCachedLibrary = false;
+      persistLibrarySnapshot(state.books);
+
+      return renderBooks().always(function () {
+        setLibraryLoadingState(false);
+        if (!getFilteredBooks().length) {
+          renderBooks();
+        }
+      });
+    }).catch(function (xhr) {
+      setLibraryLoadingState(false);
+
+      if (!state.books.length) {
+        renderBooks();
+        showNotice('Dyslibria could not load the library just now. Try again in a moment.', 'error', {
+          title: 'Library did not load',
+          timeout: 0
+        });
+        return $.Deferred().reject(xhr).promise();
+      }
+
+      updateCountLabel(getFilteredBooks().length, state.books.length);
+      return $.Deferred().reject(xhr).promise();
     });
   }
 
@@ -520,11 +740,15 @@ $(document).ready(function () {
     return $.get('/api/session').then(function (payload) {
       state.session = payload || null;
       applySessionCapabilities();
-      renderBooks();
+      if (state.books.length) {
+        renderBooks();
+      }
     }).catch(function () {
       state.session = null;
       applySessionCapabilities();
-      renderBooks();
+      if (state.books.length) {
+        renderBooks();
+      }
     });
   }
 
@@ -851,13 +1075,9 @@ $(document).ready(function () {
     scheduleNextTip();
     renderContinueCard();
     bindEvents();
+    hydrateLibraryFromCache();
 
-    $.when(loadAppConfig(), loadSession(), refreshDashboard()).fail(function () {
-      showNotice('Error loading library.', 'error', {
-        title: 'Library did not load',
-        timeout: 0
-      });
-    });
+    $.when(loadAppConfig(), loadSession(), refreshDashboard());
 
     pollSystemStatus();
   }

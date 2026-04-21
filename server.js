@@ -14,11 +14,14 @@ const { v4: uuidv4 } = require('uuid');
 const SimpleJsonDB = require('simple-json-db');
 const AdmZip = require('adm-zip');
 const xml = require('xmlbuilder');
+const {
+  convertBook,
+  inspectBook,
+  ConverterError,
+  ConversionStepError
+} = require('dyslibria-converter');
 
-const { loadDictionary } = require('./utils/dictionaryUtils');
-const { extractResources, createEpub } = require('./utils/fileUtils');
-const { processHtmlFiles } = require('./utils/htmlProcessor');
-const { extractEpubData, getEpubs } = require('./utils/epubDataUtils');
+const { extractEpubData, getEpubs, getEpubByFilename } = require('./utils/epubDataUtils');
 const {
   deleteLibraryBookFiles,
   listLibraryBookFilenames,
@@ -38,12 +41,12 @@ const userStore = createUserStore(path.join(dbDir, 'users.json'));
 const defaultUploadsDir = path.join(rootDir, 'uploads');
 const defaultProcessedDir = path.join(rootDir, 'processed');
 const tempDir = path.join(rootDir, 'temp');
-const resourcesDir = path.join(tempDir, 'resources');
 const incomingTempDir = path.join(tempDir, 'incoming');
 const failedDir = path.join(rootDir, 'failed');
-const dictionaryFilePath = path.join(rootDir, 'dictionary.txt');
 
 const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES || 100 * 1024 * 1024);
+const MAX_EPUB_ARCHIVE_ENTRIES = Number(process.env.MAX_EPUB_ARCHIVE_ENTRIES || 5000);
+const MAX_EPUB_EXTRACT_BYTES = Number(process.env.MAX_EPUB_EXTRACT_BYTES || 300 * 1024 * 1024);
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_MAX_ATTEMPTS = 20;
 
@@ -417,6 +420,46 @@ function sanitizeEpubFilename(requestedFilename) {
   return filename;
 }
 
+function buildBookCoverUrl(epub) {
+  const filename = String(epub && epub.filename || '');
+  if (!filename) {
+    return '';
+  }
+
+  const version = encodeURIComponent(String(epub.lastModified || ''));
+  return `/api/books/${encodeURIComponent(filename)}/cover${version ? `?v=${version}` : ''}`;
+}
+
+function toCatalogBook(epub) {
+  const entry = epub && typeof epub === 'object' ? epub : {};
+
+  return {
+    filename: entry.filename || '',
+    title: entry.title || '',
+    author: entry.author || '',
+    lastModified: entry.lastModified || '',
+    isValid: entry.isValid !== false,
+    processingError: entry.processingError || '',
+    coverUrl: buildBookCoverUrl(entry)
+  };
+}
+
+function parseDataUriPayload(value) {
+  const match = String(value || '').match(/^data:([^;,]+);base64,(.+)$/);
+  if (!match) {
+    return null;
+  }
+
+  try {
+    return {
+      mimeType: match[1],
+      buffer: Buffer.from(match[2], 'base64')
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
 function getReadingProgressUser(req) {
   const currentUser = getCurrentUser(req);
   if (currentUser) {
@@ -505,7 +548,6 @@ const watcherIgnoredPaths = new Set();
 const fileQueue = [];
 const conversionLogs = [];
 let isProcessing = false;
-let dictionaryPromise = null;
 
 function appendConversionLog(level, message) {
   conversionLogs.push({
@@ -536,35 +578,57 @@ async function ensureDirectoriesExist() {
   await fs.ensureDir(uploadsDir);
   await fs.ensureDir(processedDir);
   await fs.ensureDir(tempDir);
-  await fs.ensureDir(resourcesDir);
   await fs.ensureDir(incomingTempDir);
   await fs.ensureDir(failedDir);
   await fs.ensureDir(path.join(rootDir, 'db'));
 }
 
-async function getDictionary() {
-  if (!dictionaryPromise) {
-    dictionaryPromise = loadDictionary(dictionaryFilePath);
+function getConverterError(error) {
+  let currentError = error;
+
+  while (currentError) {
+    if (currentError instanceof ConverterError) {
+      return currentError;
+    }
+
+    currentError = currentError.cause;
   }
 
-  return dictionaryPromise;
+  return null;
 }
 
-function validateArchiveEntries(entries) {
-  if (!entries.length) {
-    throw new Error('The uploaded EPUB archive is empty.');
+function getConversionFailureMessage(error) {
+  const converterError = getConverterError(error);
+  if (!converterError) {
+    return error instanceof Error && error.message
+      ? error.message
+      : 'The EPUB conversion pipeline failed.';
   }
 
-  if (!entries.some((entry) => entry.entryName === 'mimetype')) {
-    throw new Error('The EPUB archive is missing the mimetype file.');
+  if (
+    converterError instanceof ConversionStepError &&
+    converterError.cause instanceof Error &&
+    converterError.cause.message &&
+    converterError.cause.message !== converterError.message
+  ) {
+    return converterError.cause.message;
   }
 
-  if (!entries.some((entry) => entry.entryName === 'META-INF/container.xml')) {
-    throw new Error('The EPUB archive is missing META-INF/container.xml.');
-  }
+  return converterError.message || 'The EPUB conversion pipeline failed.';
 }
 
-function validateUploadedEpub(epubFile) {
+function appendConverterEventLog(filename, event) {
+  if (!event || event.level === 'debug') {
+    return;
+  }
+
+  const level = event.level === 'warn' ? 'info' : event.level;
+  const step = String(event.step || '').trim();
+  const stepPrefix = step ? `[${step}] ` : '';
+  appendConversionLog(level, `${stepPrefix}${filename}: ${event.message}`);
+}
+
+async function validateUploadedEpub(epubFile) {
   if (!epubFile || !epubFile.tempFilePath) {
     throw new Error('No uploaded file data was found.');
   }
@@ -573,14 +637,21 @@ function validateUploadedEpub(epubFile) {
     throw new Error('Only .epub files are supported.');
   }
 
-  const zip = new AdmZip(epubFile.tempFilePath);
-  const entries = zip.getEntries();
-  validateArchiveEntries(entries);
+  try {
+    const zip = new AdmZip(epubFile.tempFilePath);
+    const entries = zip.getEntries();
 
-  const mimetypeEntry = zip.getEntry('mimetype');
-  const mimetype = zip.readAsText(mimetypeEntry).trim();
-  if (mimetype !== 'application/epub+zip') {
-    throw new Error('The uploaded archive does not look like a valid EPUB.');
+    if (entries.length > MAX_EPUB_ARCHIVE_ENTRIES) {
+      throw new Error(`The EPUB archive contains too many entries (${entries.length}).`);
+    }
+  } catch (error) {
+    throw new Error(getConversionFailureMessage(error));
+  }
+
+  try {
+    await inspectBook(epubFile.tempFilePath);
+  } catch (error) {
+    throw new Error(getConversionFailureMessage(error));
   }
 }
 
@@ -631,7 +702,6 @@ async function quarantineFailedUpload(job) {
 
 async function processEpubJob(job) {
   let quarantined = false;
-  const tempOutputPath = path.join(tempDir, `${job.id}.epub`);
   const finalOutputPath = path.join(processedDir, job.outputFilename);
 
   try {
@@ -639,35 +709,26 @@ async function processEpubJob(job) {
     appendConversionLog('info', `Starting conversion for ${job.outputFilename}.`);
 
     await ensureDirectoriesExist();
-    await fs.emptyDir(resourcesDir);
+    const result = await convertBook(job.uploadPath, {
+      outputPath: finalOutputPath,
+      returnBuffer: false,
+      tempRootDir: tempDir,
+      maxArchiveEntries: MAX_EPUB_ARCHIVE_ENTRIES,
+      maxExtractBytes: MAX_EPUB_EXTRACT_BYTES,
+      logger: (event) => appendConverterEventLog(job.outputFilename, event)
+    });
 
-    await extractResources(job.uploadPath, resourcesDir);
-
-    const dictionary = await getDictionary();
-    const processingResult = await processHtmlFiles(resourcesDir, dictionary);
-
-    if (processingResult.errors.length > 0) {
-      const firstError = processingResult.errors[0];
-      throw new Error(`HTML processing failed in ${firstError.filePath}: ${firstError.message}`);
-    }
-
-    if (processingResult.processedFiles === 0) {
-      throw new Error('No HTML or XHTML content files were found to convert.');
-    }
-
-    const createResult = await createEpub(resourcesDir, tempOutputPath);
-    if (!createResult.success) {
-      throw new Error(createResult.message);
-    }
-
-    await fs.move(tempOutputPath, finalOutputPath, { overwrite: true });
     await extractEpubData(processedDir);
     console.log(`Successfully processed: ${job.uploadPath}`);
-    appendConversionLog('success', `Finished converting ${job.outputFilename}.`);
+    appendConversionLog(
+      'success',
+      `Finished converting ${job.outputFilename} (${result.stats.processedFiles} content file${result.stats.processedFiles === 1 ? '' : 's'} in ${result.stats.durationMs} ms).`
+    );
   } catch (error) {
-    console.error(`Error processing EPUB ${job.uploadPath}: ${error.message}`, error);
-    appendConversionLog('error', `Failed converting ${job.outputFilename}: ${error.message}`);
-    await fs.remove(tempOutputPath);
+    const message = getConversionFailureMessage(error);
+    console.error(`Error processing EPUB ${job.uploadPath}: ${message}`, error);
+    appendConversionLog('error', `Failed converting ${job.outputFilename}: ${message}`);
+    await fs.remove(finalOutputPath);
     await quarantineFailedUpload(job);
     quarantined = true;
   } finally {
@@ -1092,7 +1153,9 @@ app.use('/processed', requireCatalogAuth, express.static(processedDir));
 // Route to get the list of EPUBs
 app.get('/epubs', requireCatalogAuth, async (req, res) => {
   try {
-    const epubs = await getEpubs();
+    const epubs = (await getEpubs())
+      .map(toCatalogBook);
+
     epubs.sort((a, b) => {
       const authorA = a.author || '';
       const authorB = b.author || '';
@@ -1102,6 +1165,37 @@ app.get('/epubs', requireCatalogAuth, async (req, res) => {
   } catch (err) {
     console.error('Error fetching EPUBs:', err);
     res.status(500).json({ success: false, message: 'Error fetching EPUBs.' });
+  }
+});
+
+app.get('/api/books/:filename/cover', requireCatalogAuth, async (req, res) => {
+  const filename = sanitizeEpubFilename(req.params.filename);
+
+  if (!filename) {
+    res.status(400).json({ success: false, message: 'Invalid EPUB file name.' });
+    return;
+  }
+
+  try {
+    const book = await getEpubByFilename(filename, { includeInvalid: true });
+    if (!book) {
+      res.status(404).json({ success: false, message: 'Cover not found.' });
+      return;
+    }
+
+    const coverAsset = parseDataUriPayload(book.cover);
+    if (!coverAsset) {
+      res.status(404).json({ success: false, message: 'Cover not found.' });
+      return;
+    }
+
+    res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+    res.setHeader('ETag', `"${createStableId(`${filename}:${book.lastModified || ''}:${String(book.cover || '').length}`)}"`);
+    res.type(coverAsset.mimeType);
+    res.send(coverAsset.buffer);
+  } catch (error) {
+    console.error('Error fetching EPUB cover:', error);
+    res.status(500).json({ success: false, message: 'Unable to load the cover image.' });
   }
 });
 
@@ -1312,7 +1406,7 @@ app.post('/upload', requireAdmin, async (req, res) => {
 
   try {
     for (const epubFile of epubFiles) {
-      validateUploadedEpub(epubFile);
+      await validateUploadedEpub(epubFile);
     }
 
     for (const epubFile of epubFiles) {

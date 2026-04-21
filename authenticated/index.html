@@ -143,6 +143,51 @@
         </div>
       </section>
 
+      <section class="library-loading is-active" id="libraryLoading" role="status" aria-live="polite">
+        <div class="library-loading-copy">
+          <span class="library-loading-spinner" aria-hidden="true"></span>
+          <div>
+            <strong id="libraryLoadingTitle">Loading your library</strong>
+            <p id="libraryLoadingText">Gathering your books and preparing the shelf.</p>
+          </div>
+        </div>
+
+        <div class="library-skeleton-grid" id="librarySkeletonGrid" aria-hidden="true">
+          <article class="book-skeleton">
+            <div class="book-skeleton-cover"></div>
+            <div class="book-skeleton-body">
+              <span class="book-skeleton-line is-title"></span>
+              <span class="book-skeleton-line"></span>
+              <span class="book-skeleton-line is-chip"></span>
+            </div>
+          </article>
+          <article class="book-skeleton">
+            <div class="book-skeleton-cover"></div>
+            <div class="book-skeleton-body">
+              <span class="book-skeleton-line is-title"></span>
+              <span class="book-skeleton-line"></span>
+              <span class="book-skeleton-line is-chip"></span>
+            </div>
+          </article>
+          <article class="book-skeleton">
+            <div class="book-skeleton-cover"></div>
+            <div class="book-skeleton-body">
+              <span class="book-skeleton-line is-title"></span>
+              <span class="book-skeleton-line"></span>
+              <span class="book-skeleton-line is-chip"></span>
+            </div>
+          </article>
+          <article class="book-skeleton">
+            <div class="book-skeleton-cover"></div>
+            <div class="book-skeleton-body">
+              <span class="book-skeleton-line is-title"></span>
+              <span class="book-skeleton-line"></span>
+              <span class="book-skeleton-line is-chip"></span>
+            </div>
+          </article>
+        </div>
+      </section>
+
       <section class="library-grid" id="epubCards" aria-live="polite"></section>
 
       <section class="empty-state" id="emptyState" hidden>

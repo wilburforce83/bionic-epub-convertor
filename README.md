@@ -8,6 +8,8 @@ It combines three things in one container:
 - a browser reading app with saved reading progress
 - OPDS and WebDAV access for external readers and library tools
 
+The conversion engine is now provided by the published `dyslibria-converter` npm package so the self-hosted app, CLI, and future hosted workers share the same EPUB processing behavior.
+
 You can run it on a home server, NAS, VPS, mini PC, or a small classroom/community setup. The aim is simple: keep your books, your reading progress, and your access under your control.
 
 ## What Dyslibria Includes
@@ -73,7 +75,7 @@ docker compose up -d
 If you want to pin a release instead of tracking `latest`, set:
 
 ```env
-IMAGE_TAG=1.0.5
+IMAGE_TAG=1.0.6
 ```
 
 and then run:

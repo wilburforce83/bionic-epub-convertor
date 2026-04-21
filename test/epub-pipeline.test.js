@@ -4,9 +4,8 @@ const os = require('node:os');
 const path = require('node:path');
 const fs = require('fs-extra');
 const AdmZip = require('adm-zip');
+const { convertBook, resolveZipEntryPath } = require('dyslibria-converter');
 
-const { createEpub, resolveZipEntryPath } = require('../utils/fileUtils');
-const { processHtmlFiles } = require('../utils/htmlProcessor');
 const { extractEpubData, getEpubs } = require('../utils/epubDataUtils');
 const {
   deleteLibraryBookFiles,
@@ -17,6 +16,29 @@ const { createMinimalEpub } = require('./helpers/epubTestUtils');
 
 async function makeTempDir(prefix) {
   return fs.mkdtemp(path.join(os.tmpdir(), prefix));
+}
+
+async function convertFixtureEpub(epubOptions = {}, convertOptions = {}) {
+  const tempDir = await makeTempDir('dyslibria-convert-');
+  const inputPath = path.join(tempDir, 'input.epub');
+  const outputPath = path.join(tempDir, 'output.epub');
+  const workspaceRoot = path.join(tempDir, 'workspace');
+
+  await createMinimalEpub(inputPath, epubOptions);
+  await fs.ensureDir(workspaceRoot);
+  const result = await convertBook(inputPath, {
+    outputPath,
+    returnBuffer: false,
+    tempRootDir: workspaceRoot,
+    ...convertOptions
+  });
+
+  return {
+    tempDir,
+    inputPath,
+    outputPath,
+    result
+  };
 }
 
 const tinyPngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+lmVsAAAAASUVORK5CYII=';
@@ -32,51 +54,40 @@ test('resolveZipEntryPath rejects zip-slip style archive entries', async () => {
   assert.equal(await fs.pathExists(path.join(tempDir, 'escape.txt')), false);
 });
 
-test('processHtmlFiles converts readable text but leaves preformatted blocks alone', async () => {
-  const tempDir = await makeTempDir('dyslibria-html-');
-  const filePath = path.join(tempDir, 'chapter.xhtml');
-
-  await fs.writeFile(
-    filePath,
-    `<?xml version="1.0" encoding="UTF-8"?>
+test('convertBook transforms readable text but leaves preformatted blocks alone', async () => {
+  const { outputPath, result } = await convertFixtureEpub({
+    chapterMarkup: `<?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml">
   <body>
     <p>This smoke test should be converted.</p>
     <pre>Literal sample text</pre>
   </body>
 </html>`
-  );
+  });
 
-  const result = await processHtmlFiles(tempDir, new Set());
-  const content = await fs.readFile(filePath, 'utf-8');
+  const content = new AdmZip(outputPath).readAsText('OEBPS/chapter1.xhtml');
 
-  assert.equal(result.processedFiles, 1);
-  assert.deepEqual(result.errors, []);
+  assert.ok(result.outputPath);
+  assert.equal(result.stats.processedFiles, 1);
   assert.match(content, /<p><b>Th<\/b>is <b>sm<\/b>oke <b>te<\/b>st/);
   assert.match(content, /<pre>Literal sample text<\/pre>/);
   assert.doesNotMatch(content, /<pre><b>/);
 });
 
-test('processHtmlFiles escapes stray ampersands without double-escaping valid entities', async () => {
-  const tempDir = await makeTempDir('dyslibria-entities-');
-  const filePath = path.join(tempDir, 'entities.xhtml');
-
-  await fs.writeFile(
-    filePath,
-    `<?xml version="1.0" encoding="UTF-8"?>
+test('convertBook escapes stray ampersands without double-escaping valid entities', async () => {
+  const { outputPath, result } = await convertFixtureEpub({
+    chapterMarkup: `<?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml">
   <body>
     <p>AT&T and Tom &amp; Jerry & Blues</p>
     <pre>R&D && Co.</pre>
   </body>
 </html>`
-  );
+  });
 
-  const result = await processHtmlFiles(tempDir, new Set());
-  const content = await fs.readFile(filePath, 'utf-8');
+  const content = new AdmZip(outputPath).readAsText('OEBPS/chapter1.xhtml');
 
-  assert.equal(result.processedFiles, 1);
-  assert.deepEqual(result.errors, []);
+  assert.equal(result.stats.processedFiles, 1);
   assert.match(content, /<b>A<\/b>T&amp;<b>T<\/b>/);
   assert.match(content, /<b>T<\/b>om &amp; <b>Je<\/b>rry &amp; <b>Bl<\/b>ues/);
   assert.match(content, /<pre>R&amp;D &amp;&amp; Co\.<\/pre>/);
@@ -84,43 +95,22 @@ test('processHtmlFiles escapes stray ampersands without double-escaping valid en
   assert.doesNotMatch(content, /&amp;<b>a<\/b>mp;/);
 });
 
-test('processHtmlFiles can handle XHTML fragments without a body wrapper', async () => {
-  const tempDir = await makeTempDir('dyslibria-fragment-');
-  const filePath = path.join(tempDir, 'fragment.xhtml');
+test('convertBook can handle XHTML fragments without a body wrapper', async () => {
+  const { outputPath, result } = await convertFixtureEpub({
+    chapterMarkup: '<p>Loose fragment text only.</p>'
+  });
+  const content = new AdmZip(outputPath).readAsText('OEBPS/chapter1.xhtml');
 
-  await fs.writeFile(filePath, '<p>Loose fragment text only.</p>');
-
-  const result = await processHtmlFiles(tempDir, new Set());
-  const content = await fs.readFile(filePath, 'utf-8');
-
-  assert.equal(result.processedFiles, 1);
+  assert.equal(result.stats.processedFiles, 1);
   assert.match(content, /<p><b>Lo<\/b>ose <b>frag<\/b>ment <b>te<\/b>xt <b>on<\/b>ly\.<\/p>/);
 });
 
-test('createEpub writes EPUB entry paths using forward slashes', async (t) => {
-  t.mock.method(console, 'log', () => {});
-
-  const tempDir = await makeTempDir('dyslibria-create-');
-  const resourcesPath = path.join(tempDir, 'resources');
-  const outputPath = path.join(tempDir, 'created.epub');
-
-  await fs.ensureDir(path.join(resourcesPath, 'META-INF'));
-  await fs.ensureDir(path.join(resourcesPath, 'OEBPS', 'Text'));
-  await fs.writeFile(path.join(resourcesPath, 'mimetype'), 'application/epub+zip');
-  await fs.writeFile(
-    path.join(resourcesPath, 'META-INF', 'container.xml'),
-    '<?xml version="1.0" encoding="UTF-8"?><container></container>'
-  );
-  await fs.writeFile(
-    path.join(resourcesPath, 'OEBPS', 'Text', 'chapter.xhtml'),
-    '<p>hello world</p>'
-  );
-
-  const result = await createEpub(resourcesPath, outputPath);
+test('convertBook writes EPUB entry paths using forward slashes', async () => {
+  const { outputPath, result } = await convertFixtureEpub();
   const entryNames = new AdmZip(outputPath).getEntries().map((entry) => entry.entryName);
 
-  assert.equal(result.success, true);
-  assert.ok(entryNames.includes('OEBPS/Text/chapter.xhtml'));
+  assert.equal(result.outputPath, outputPath);
+  assert.ok(entryNames.includes('OEBPS/chapter1.xhtml'));
   assert.equal(entryNames.some((entryName) => entryName.includes('\\')), false);
 });
 

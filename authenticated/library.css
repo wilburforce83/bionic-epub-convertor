@@ -482,6 +482,123 @@ body.theme-dark .app-notice.is-error {
   background: var(--library-chip-muted);
 }
 
+.library-loading {
+  margin-top: 1.25rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--library-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--library-panel);
+  box-shadow: var(--library-shadow);
+  display: none;
+  gap: 1rem;
+}
+
+.library-loading.is-active {
+  display: grid;
+}
+
+.library-loading.is-compact {
+  padding: 0.85rem 1rem;
+}
+
+.library-loading.is-compact .library-skeleton-grid {
+  display: none;
+}
+
+.library-loading-copy {
+  display: flex;
+  align-items: start;
+  gap: 0.9rem;
+}
+
+.library-loading-copy strong {
+  display: block;
+  font-size: 1rem;
+}
+
+.library-loading-copy p {
+  margin: 0.2rem 0 0;
+  color: var(--library-muted);
+  line-height: 1.55;
+}
+
+.library-loading-spinner {
+  width: 1.2rem;
+  height: 1.2rem;
+  margin-top: 0.15rem;
+  border: 2px solid rgba(var(--library-accent-rgb), 0.16);
+  border-top-color: var(--library-accent);
+  border-radius: 50%;
+  animation: librarySpinner 850ms linear infinite;
+  flex-shrink: 0;
+}
+
+.library-skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 1rem;
+}
+
+.book-skeleton {
+  border: 1px solid var(--library-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--library-chip);
+  overflow: hidden;
+}
+
+.book-skeleton-cover,
+.book-skeleton-line {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(var(--library-accent-rgb), 0.16) 50%,
+    rgba(255, 255, 255, 0.08) 100%
+  );
+  background-size: 220% 100%;
+  animation: skeletonSweep 1.45s ease-in-out infinite;
+}
+
+.book-skeleton-cover {
+  aspect-ratio: 2 / 3;
+}
+
+.book-skeleton-body {
+  padding: 1rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.book-skeleton-line {
+  display: block;
+  height: 0.9rem;
+  border-radius: 999px;
+}
+
+.book-skeleton-line.is-title {
+  width: 78%;
+  height: 1.15rem;
+}
+
+.book-skeleton-line.is-chip {
+  width: 42%;
+  margin-top: 0.25rem;
+}
+
+@keyframes librarySpinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes skeletonSweep {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -20% 0;
+  }
+}
+
 .library-grid {
   margin-top: 1.25rem;
   display: grid;
@@ -499,6 +616,8 @@ body.theme-dark .app-notice.is-error {
   box-shadow: var(--library-shadow);
   overflow: hidden;
   transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  content-visibility: auto;
+  contain-intrinsic-size: 22rem;
 }
 
 .library-card:hover,
