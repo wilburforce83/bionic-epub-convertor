@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.15 - 2026-04-22
+
+### Changed
+
+- upgraded the shared `dyslibria-converter` dependency to `0.3.0`
+- enabled the converter's default EPUB image optimization profile for all uploaded books so self-hosted processing now uses the same aggressive-safe size reduction path by default
+
 ## 1.0.7 - 2026-04-21
 
 ### Added

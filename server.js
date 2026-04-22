@@ -811,6 +811,7 @@ async function processEpubJob(job) {
     await ensureDirectoriesExist();
     const result = await convertBook(job.uploadPath, {
       outputPath: finalOutputPath,
+      optimizeImages: true,
       returnBuffer: false,
       tempRootDir: tempDir,
       maxArchiveEntries: MAX_EPUB_ARCHIVE_ENTRIES,
