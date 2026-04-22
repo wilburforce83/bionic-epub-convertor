@@ -4,6 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const fs = require('fs-extra');
 const AdmZip = require('adm-zip');
+const sharp = require('sharp');
 const { convertBook, resolveZipEntryPath } = require('dyslibria-converter');
 
 const { extractEpubData, getEpubs } = require('../utils/epubDataUtils');
@@ -42,6 +43,38 @@ async function convertFixtureEpub(epubOptions = {}, convertOptions = {}) {
 }
 
 const tinyPngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+lmVsAAAAASUVORK5CYII=';
+
+function parseDataUriAsset(dataUri) {
+  const match = /^data:([^;]+);base64,(.+)$/u.exec(String(dataUri || ''));
+
+  assert.ok(match, 'Expected a base64 data URI');
+
+  return {
+    mimeType: match[1],
+    buffer: Buffer.from(match[2], 'base64')
+  };
+}
+
+async function createLargeJpegBase64(width = 1800, height = 2600) {
+  const rawBuffer = Buffer.alloc(width * height * 3);
+
+  for (let index = 0; index < rawBuffer.length; index += 1) {
+    rawBuffer[index] = (index * 31 + 17) % 256;
+  }
+
+  const jpegBuffer = await sharp(rawBuffer, {
+    raw: {
+      width,
+      height,
+      channels: 3
+    }
+  }).jpeg({
+    quality: 92,
+    mozjpeg: true
+  }).toBuffer();
+
+  return jpegBuffer.toString('base64');
+}
 
 test('resolveZipEntryPath rejects zip-slip style archive entries', async () => {
   const tempDir = await makeTempDir('dyslibria-zip-slip-');
@@ -202,6 +235,34 @@ test('extractEpubData does not replace an explicit cover with a larger fallback 
   assert.equal(books.length, 1);
   assert.match(books[0].cover, /^data:image\/png;base64,/);
   assert.ok(!books[0].cover.includes('PHN2Zy'));
+});
+
+test('extractEpubData stores compact preview covers for large explicit cover images', async () => {
+  const tempDir = await makeTempDir('dyslibria-cover-preview-');
+  const processedDir = path.join(tempDir, 'processed');
+  const cachePath = path.join(tempDir, 'db', 'epubData.json');
+  const largeCoverBase64 = await createLargeJpegBase64();
+  const sourceCoverBuffer = Buffer.from(largeCoverBase64, 'base64');
+
+  await fs.ensureDir(processedDir);
+  await createMinimalEpub(path.join(processedDir, 'large-cover.epub'), {
+    title: 'Large Cover',
+    author: 'Codex',
+    coverFileName: 'images/cover.jpg',
+    coverImageBase64: largeCoverBase64
+  });
+
+  await extractEpubData(processedDir, { cachePath });
+
+  const books = await getEpubs({ cachePath });
+  const previewAsset = parseDataUriAsset(books[0].cover);
+  const previewMetadata = await sharp(previewAsset.buffer).metadata();
+
+  assert.equal(books.length, 1);
+  assert.equal(previewAsset.mimeType, 'image/jpeg');
+  assert.ok(previewAsset.buffer.length < sourceCoverBuffer.length);
+  assert.ok(previewMetadata.width <= 320);
+  assert.ok(previewMetadata.height <= 480);
 });
 
 test('libraryMaintenance lists and deletes only EPUB library files', async () => {

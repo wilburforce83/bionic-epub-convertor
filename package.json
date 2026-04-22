@@ -1,6 +1,6 @@
 {
     "name": "epub-processor",
-    "version": "1.0.15",
+    "version": "1.0.16",
     "description": "Self-hosted EPUB processing and library management with bionic text conversion.",
     "main": "server.js",
     "scripts": {
@@ -20,6 +20,7 @@
         "image-size": "^2.0.2",
         "jszip": "^3.10.1",
         "node-cron": "^3.0.3",
+        "sharp": "^0.34.5",
         "simple-json-db": "^2.0.0",
         "uuid": "^10.0.0",
         "webdav-server": "^2.6.2",

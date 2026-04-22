@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.16 - 2026-04-22
+
+### Fixed
+
+- stopped startup metadata refresh from embedding full-size cover images into `db/epubData.json`, which could exhaust the Node heap on larger libraries and leave the container stuck restarting
+- limited fallback cover detection to a small set of likely candidates and generated compact preview covers instead, keeping boot-time library scans lightweight even for image-heavy EPUB collections
+
 ## 1.0.15 - 2026-04-22
 
 ### Changed
