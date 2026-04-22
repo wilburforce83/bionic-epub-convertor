@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.18 - 2026-04-22
+
+### Changed
+
+- bumped the official Docker runtime and build images from Node 20 to Node 24 after validating install, test, build, and startup behavior on the newer base image
+- updated the Docker publish workflow to force JavaScript actions onto Node 24 now, matching GitHub's recommended migration path ahead of the Node 20 runner deprecation
+
 ## 1.0.17 - 2026-04-22
 
 ### Added
