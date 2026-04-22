@@ -1764,7 +1764,7 @@ $(document).ready(function () {
       applyMetadataLoadingState();
     }
 
-    if (previousStatus && !state.autoRefreshInFlight && (metadataBecameReady || metadataChanged)) {
+    if (previousStatus && !state.autoRefreshInFlight && !isBusy && (metadataBecameReady || metadataChanged)) {
       triggerAutomaticLibraryRefresh();
     }
 

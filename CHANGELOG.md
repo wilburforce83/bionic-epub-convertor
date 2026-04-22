@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.19 - 2026-04-22
+
+### Fixed
+
+- deferred automatic library refreshes until the conversion queue is actually idle, so large batch uploads no longer keep flashing the "Refreshing your library" state after each completed book
+
 ## 1.0.18 - 2026-04-22
 
 ### Changed
