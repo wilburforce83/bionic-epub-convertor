@@ -841,6 +841,31 @@ body.theme-dark .app-notice.is-error {
   gap: 1.2rem;
 }
 
+.library-grid-sentinel {
+  grid-column: 1 / -1;
+  min-height: 3rem;
+  padding: 0.85rem 1.1rem;
+  border: 1px solid var(--library-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--library-chip);
+  color: var(--library-text);
+  justify-self: center;
+  transition: background 160ms ease, color 160ms ease, transform 160ms ease, opacity 160ms ease;
+}
+
+.library-grid-sentinel:hover,
+.library-grid-sentinel:focus-visible {
+  background: var(--library-highlight);
+  color: var(--library-accent-strong);
+  transform: translateY(-1px);
+}
+
+.library-grid-sentinel[disabled] {
+  opacity: 0.72;
+  cursor: wait;
+  transform: none;
+}
+
 .library-grid.is-compact {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 1rem;

@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const crypto = require('crypto');
 const express = require('express');
+const compression = require('compression');
 const fileUpload = require('express-fileupload');
 const path = require('path');
 const fs = require('fs-extra');
@@ -9,6 +10,7 @@ const chokidar = require('chokidar');
 const cron = require('node-cron');
 const { v2: webdav } = require('webdav-server');
 const session = require('express-session');
+const FileStore = require('session-file-store')(session);
 const { execFile } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 const SimpleJsonDB = require('simple-json-db');
@@ -21,7 +23,13 @@ const {
   ConversionStepError
 } = require('dyslibria-converter');
 
-const { extractEpubData, getEpubs, getEpubByFilename } = require('./utils/epubDataUtils');
+const {
+  extractEpubData,
+  upsertEpubMetadataForFile,
+  removeEpubMetadataForFile,
+  getEpubs,
+  getEpubByFilename
+} = require('./utils/epubDataUtils');
 const {
   deleteLibraryBookFiles,
   listLibraryBookFilenames,
@@ -35,11 +43,19 @@ const packageMetadata = require('./package.json');
 const app = express();
 const rootDir = __dirname;
 const dbDir = path.join(rootDir, 'db');
+const metadataCachePath = path.join(dbDir, 'epubData.json');
+const sessionStorePath = path.join(dbDir, 'sessions');
 fs.ensureDirSync(dbDir);
+fs.ensureDirSync(sessionStorePath);
 const settingsDb = new SimpleJsonDB(path.join(dbDir, 'db.json'));
 const runtimeDb = new SimpleJsonDB(path.join(dbDir, 'runtime.json'));
 const readingProgressDb = new SimpleJsonDB(path.join(dbDir, 'reading-progress.json'));
 const userStore = createUserStore(path.join(dbDir, 'users.json'));
+const sessionStore = new FileStore({
+  path: sessionStorePath,
+  retries: 0,
+  logFn: () => {}
+});
 
 const defaultUploadsDir = path.join(rootDir, 'uploads');
 const defaultProcessedDir = path.join(rootDir, 'processed');
@@ -263,9 +279,11 @@ userStore.ensureLegacyAdmin({
 
 app.set('trust proxy', true);
 app.disable('x-powered-by');
+app.use(compression());
 
 app.use(session({
   secret: sessionSecret,
+  store: sessionStore,
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -524,8 +542,9 @@ function buildBookCoverUrl(epub) {
   }
 
   const version = encodeURIComponent([
+    String(epub.coverVersion || ''),
     String(epub.lastModified || ''),
-    String(epub.metadataRefreshedAt || '')
+    String(epub.fileSizeBytes || '')
   ].filter(Boolean).join(':'));
   return `/api/books/${encodeURIComponent(filename)}/cover${version ? `?v=${version}` : ''}`;
 }
@@ -648,6 +667,8 @@ const watcherIgnoredPaths = new Set();
 const fileQueue = [];
 const conversionLogs = [];
 let isProcessing = false;
+let metadataRefreshInFlight = false;
+let metadataTaskChain = Promise.resolve();
 
 function appendConversionLog(level, message) {
   conversionLogs.push({
@@ -670,8 +691,78 @@ function getRuntimeStatus() {
   };
 }
 
+async function getMetadataStatus() {
+  try {
+    const metadataReady = await fs.pathExists(metadataCachePath);
+    if (!metadataReady) {
+      return {
+        ready: false,
+        refreshing: metadataRefreshInFlight,
+        updatedAtMs: 0
+      };
+    }
+
+    const fileStat = await fs.stat(metadataCachePath);
+    return {
+      ready: true,
+      refreshing: metadataRefreshInFlight,
+      updatedAtMs: Math.round(fileStat.mtimeMs)
+    };
+  } catch (error) {
+    if (error && error.code === 'ENOENT') {
+      return {
+        ready: false,
+        refreshing: metadataRefreshInFlight,
+        updatedAtMs: 0
+      };
+    }
+
+    throw error;
+  }
+}
+
 async function getMetadataReady() {
-  return fs.pathExists(path.join(rootDir, 'db', 'epubData.json'));
+  const metadataStatus = await getMetadataStatus();
+  return metadataStatus.ready;
+}
+
+function enqueueMetadataTask(task) {
+  metadataTaskChain = metadataTaskChain.then(task, task);
+  return metadataTaskChain;
+}
+
+async function refreshLibraryMetadata(options = {}) {
+  return enqueueMetadataTask(async () => {
+    metadataRefreshInFlight = true;
+
+    try {
+      return await extractEpubData(processedDir, {
+        cachePath: metadataCachePath,
+        force: options.force
+      });
+    } finally {
+      metadataRefreshInFlight = false;
+    }
+  });
+}
+
+function refreshLibraryMetadataInBackground(options = {}) {
+  void refreshLibraryMetadata(options).catch((error) => {
+    console.error('Error refreshing library metadata:', error);
+    appendConversionLog('error', `Library metadata refresh failed: ${error.message}`);
+  });
+}
+
+async function upsertLibraryMetadataForFile(filename) {
+  return enqueueMetadataTask(() => upsertEpubMetadataForFile(processedDir, filename, {
+    cachePath: metadataCachePath
+  }));
+}
+
+async function removeLibraryMetadataForFile(filename) {
+  return enqueueMetadataTask(() => removeEpubMetadataForFile(filename, {
+    cachePath: metadataCachePath
+  }));
 }
 
 async function ensureDirectoriesExist() {
@@ -819,7 +910,7 @@ async function processEpubJob(job) {
       logger: (event) => appendConverterEventLog(job.outputFilename, event)
     });
 
-    await extractEpubData(processedDir);
+    await upsertLibraryMetadataForFile(job.outputFilename);
     console.log(`Successfully processed: ${job.uploadPath}`);
     appendConversionLog(
       'success',
@@ -1019,13 +1110,15 @@ function normalizeSettingsUpdate(payload) {
 
 // Basic route to serve the login page
 app.get('/healthz', async (req, res) => {
-  const metadataReady = await getMetadataReady();
+  const metadataStatus = await getMetadataStatus();
 
   res.json({
     status: 'ok',
     processing: isProcessing,
     queueLength: fileQueue.length,
-    metadataReady
+    metadataReady: metadataStatus.ready,
+    metadataRefreshing: metadataStatus.refreshing,
+    metadataUpdatedAtMs: metadataStatus.updatedAtMs
   });
 });
 
@@ -1057,11 +1150,13 @@ app.get('/api/session', isAuthenticated, (req, res) => {
 });
 
 app.get('/api/system-status', isAuthenticated, async (req, res) => {
-  const metadataReady = await getMetadataReady();
+  const metadataStatus = await getMetadataStatus();
   const runtimeStatus = getRuntimeStatus();
   res.json({
     success: true,
-    metadataReady,
+    metadataReady: metadataStatus.ready,
+    metadataRefreshing: metadataStatus.refreshing,
+    metadataUpdatedAtMs: metadataStatus.updatedAtMs,
     processing: runtimeStatus.processing,
     queueLength: runtimeStatus.queueLength,
     logCount: runtimeStatus.logs.length,
@@ -1286,7 +1381,8 @@ app.use('/processed', requireCatalogAuth, express.static(processedDir));
 // Route to get the list of EPUBs
 app.get('/epubs', requireCatalogAuth, async (req, res) => {
   try {
-    const epubs = (await getEpubs())
+    const metadataStatus = await getMetadataStatus();
+    const epubs = (await getEpubs({ cachePath: metadataCachePath }))
       .map(toCatalogBook);
 
     epubs.sort((a, b) => {
@@ -1294,6 +1390,9 @@ app.get('/epubs', requireCatalogAuth, async (req, res) => {
       const authorB = b.author || '';
       return authorA.localeCompare(authorB);
     });
+    res.setHeader('X-Dyslibria-Metadata-Ready', metadataStatus.ready ? '1' : '0');
+    res.setHeader('X-Dyslibria-Metadata-Refreshing', metadataStatus.refreshing ? '1' : '0');
+    res.setHeader('X-Dyslibria-Metadata-Updated-At', String(metadataStatus.updatedAtMs || 0));
     res.json(epubs);
   } catch (err) {
     console.error('Error fetching EPUBs:', err);
@@ -1310,7 +1409,10 @@ app.get('/api/books/:filename/cover', requireCatalogAuth, async (req, res) => {
   }
 
   try {
-    const book = await getEpubByFilename(filename, { includeInvalid: true });
+    const book = await getEpubByFilename(filename, {
+      includeInvalid: true,
+      cachePath: metadataCachePath
+    });
     if (!book) {
       res.status(404).json({ success: false, message: 'Cover not found.' });
       return;
@@ -1325,7 +1427,7 @@ app.get('/api/books/:filename/cover', requireCatalogAuth, async (req, res) => {
     res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
     res.setHeader(
       'ETag',
-      `"${createStableId(`${filename}:${book.lastModified || ''}:${book.metadataRefreshedAt || ''}:${String(book.cover || '').length}`)}"`
+      `"${createStableId(`${filename}:${book.coverVersion || ''}:${book.lastModified || ''}:${String(book.cover || '').length}`)}"`
     );
     res.type(coverAsset.mimeType);
     res.send(coverAsset.buffer);
@@ -1359,7 +1461,10 @@ app.get('/api/reading-progress', isAuthenticated, async (req, res) => {
   }
 
   try {
-    const availableBooks = await getEpubs({ includeInvalid: true });
+    const availableBooks = await getEpubs({
+      includeInvalid: true,
+      cachePath: metadataCachePath
+    });
     const availableFilenames = new Set(availableBooks.map((entry) => entry.filename));
     const entries = Object.values(readingProgressDb.JSON())
       .filter((entry) => entry && entry.filename && availableFilenames.has(entry.filename) && (
@@ -1472,7 +1577,7 @@ app.delete('/api/books/:filename', requireAdmin, async (req, res) => {
       return;
     }
 
-    await extractEpubData(processedDir);
+    await removeLibraryMetadataForFile(filename);
     appendConversionLog('info', `Deleted library book ${filename}.`);
 
     res.json({
@@ -1497,7 +1602,7 @@ app.delete('/api/books', requireAdmin, async (req, res) => {
       replaceReadingProgressEntries({});
     }
 
-    await extractEpubData(processedDir);
+    await refreshLibraryMetadata();
     appendConversionLog(
       'info',
       `Deleted ${deletedFilenames.length} library book${deletedFilenames.length === 1 ? '' : 's'}${removeReadingProgress ? ' and cleared all reading progress.' : '.'}`
@@ -1519,7 +1624,7 @@ app.delete('/api/books', requireAdmin, async (req, res) => {
 app.post('/update-database', requireAdmin, async (req, res) => {
   try {
     appendConversionLog('info', 'Manual library refresh requested.');
-    await extractEpubData(processedDir);
+    await refreshLibraryMetadata({ force: true });
     appendConversionLog('success', 'Library metadata refresh completed.');
     res.json({ success: true });
   } catch (err) {
@@ -1692,18 +1797,13 @@ app.post('/restart-server', requireAdmin, (req, res) => {
 
 // Schedule the database update every 4 hours
 cron.schedule('0 */4 * * *', async () => {
-  try {
-    await extractEpubData(processedDir);
-    console.log('Database updated successfully');
-  } catch (err) {
-    console.error('Error updating database:', err);
-  }
+  refreshLibraryMetadataInBackground();
 });
 
 // OPDS route
 app.get('/opds', requireCatalogAuth, async (req, res) => {
   try {
-    const epubs = await getEpubs();
+    const epubs = await getEpubs({ cachePath: metadataCachePath });
     const feed = createOpdsFeed(epubs, getBaseUrl(req));
     res.type('application/atom+xml').send(feed);
   } catch (err) {
@@ -1714,15 +1814,6 @@ app.get('/opds', requireCatalogAuth, async (req, res) => {
 
 async function startApplication() {
   await ensureDirectoriesExist();
-  await extractEpubData(processedDir);
-  startUploadsWatcher();
-  try {
-    await queueExistingUploads();
-  } catch (error) {
-    console.error('Error scanning uploads on startup:', error);
-    appendConversionLog('error', `Startup upload scan failed: ${error.message}`);
-  }
-
   app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
   });
@@ -1745,6 +1836,24 @@ async function startApplication() {
 
   webdavServer.start(webdavPort);
   console.log(`WebDAV server is running on http://localhost:${webdavPort}`);
+
+  startUploadsWatcher();
+
+  void queueExistingUploads().catch((error) => {
+    console.error('Error scanning uploads on startup:', error);
+    appendConversionLog('error', `Startup upload scan failed: ${error.message}`);
+  });
+
+  const metadataReady = await getMetadataReady();
+  appendConversionLog(
+    'info',
+    metadataReady
+      ? 'Using cached library metadata on startup. A background reconcile will check for external file changes.'
+      : 'Library metadata cache missing. Building it in the background now.'
+  );
+  refreshLibraryMetadataInBackground({
+    force: !metadataReady
+  });
 }
 
 startApplication().catch((error) => {

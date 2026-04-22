@@ -7,7 +7,12 @@ const AdmZip = require('adm-zip');
 const sharp = require('sharp');
 const { convertBook, resolveZipEntryPath } = require('dyslibria-converter');
 
-const { extractEpubData, getEpubs } = require('../utils/epubDataUtils');
+const {
+  extractEpubData,
+  upsertEpubMetadataForFile,
+  removeEpubMetadataForFile,
+  getEpubs
+} = require('../utils/epubDataUtils');
 const {
   deleteLibraryBookFiles,
   listLibraryBookFilenames,
@@ -263,6 +268,103 @@ test('extractEpubData stores compact preview covers for large explicit cover ima
   assert.ok(previewAsset.buffer.length < sourceCoverBuffer.length);
   assert.ok(previewMetadata.width <= 320);
   assert.ok(previewMetadata.height <= 480);
+});
+
+test('extractEpubData reuses the cached metadata file when EPUB files are unchanged', async () => {
+  const tempDir = await makeTempDir('dyslibria-metadata-cache-hit-');
+  const processedDir = path.join(tempDir, 'processed');
+  const cachePath = path.join(tempDir, 'db', 'epubData.json');
+
+  await fs.ensureDir(processedDir);
+  await createMinimalEpub(path.join(processedDir, 'cache-hit.epub'), {
+    title: 'Cache Hit',
+    author: 'Codex',
+    coverFileName: 'images/cover.png',
+    coverImageBase64: tinyPngBase64
+  });
+
+  const firstEntries = await extractEpubData(processedDir, { cachePath });
+  const firstStat = await fs.stat(cachePath);
+
+  await new Promise((resolve) => setTimeout(resolve, 30));
+
+  const secondEntries = await extractEpubData(processedDir, { cachePath });
+  const secondStat = await fs.stat(cachePath);
+
+  assert.deepEqual(secondEntries, firstEntries);
+  assert.equal(secondStat.mtimeMs, firstStat.mtimeMs);
+});
+
+test('upsertEpubMetadataForFile refreshes only the changed cached EPUB entry', async () => {
+  const tempDir = await makeTempDir('dyslibria-metadata-upsert-');
+  const processedDir = path.join(tempDir, 'processed');
+  const cachePath = path.join(tempDir, 'db', 'epubData.json');
+
+  await fs.ensureDir(processedDir);
+  await createMinimalEpub(path.join(processedDir, 'alpha.epub'), {
+    title: 'Alpha',
+    author: 'Codex',
+    coverFileName: 'images/cover.png',
+    coverImageBase64: tinyPngBase64
+  });
+  await createMinimalEpub(path.join(processedDir, 'beta.epub'), {
+    title: 'Beta',
+    author: 'Codex',
+    coverFileName: 'images/cover.png',
+    coverImageBase64: tinyPngBase64
+  });
+
+  await extractEpubData(processedDir, { cachePath });
+  const beforeBooks = await getEpubs({ cachePath, includeInvalid: true });
+  const beforeAlpha = beforeBooks.find((book) => book.filename === 'alpha.epub');
+  const beforeBeta = beforeBooks.find((book) => book.filename === 'beta.epub');
+
+  await new Promise((resolve) => setTimeout(resolve, 30));
+
+  await createMinimalEpub(path.join(processedDir, 'alpha.epub'), {
+    title: 'Alpha Updated',
+    author: 'Codex',
+    chapterText: 'Updated chapter text.',
+    coverFileName: 'images/cover.png',
+    coverImageBase64: tinyPngBase64
+  });
+
+  const updatedAlpha = await upsertEpubMetadataForFile(processedDir, 'alpha.epub', { cachePath });
+  const afterBooks = await getEpubs({ cachePath, includeInvalid: true });
+  const afterAlpha = afterBooks.find((book) => book.filename === 'alpha.epub');
+  const afterBeta = afterBooks.find((book) => book.filename === 'beta.epub');
+
+  assert.equal(updatedAlpha.title, 'Alpha Updated');
+  assert.equal(afterAlpha.title, 'Alpha Updated');
+  assert.notEqual(afterAlpha.coverVersion, beforeAlpha.coverVersion);
+  assert.equal(afterBeta.coverVersion, beforeBeta.coverVersion);
+  assert.equal(afterBeta.metadataRefreshedAt, beforeBeta.metadataRefreshedAt);
+});
+
+test('removeEpubMetadataForFile removes one cached EPUB without rewriting the rest of the library', async () => {
+  const tempDir = await makeTempDir('dyslibria-metadata-remove-');
+  const processedDir = path.join(tempDir, 'processed');
+  const cachePath = path.join(tempDir, 'db', 'epubData.json');
+
+  await fs.ensureDir(processedDir);
+  await createMinimalEpub(path.join(processedDir, 'remove-me.epub'), {
+    title: 'Remove Me',
+    author: 'Codex'
+  });
+  await createMinimalEpub(path.join(processedDir, 'keep-me.epub'), {
+    title: 'Keep Me',
+    author: 'Codex'
+  });
+
+  await extractEpubData(processedDir, { cachePath });
+  const removed = await removeEpubMetadataForFile('remove-me.epub', { cachePath });
+  const remainingBooks = await getEpubs({ cachePath, includeInvalid: true });
+
+  assert.equal(removed, true);
+  assert.deepEqual(
+    remainingBooks.map((book) => book.filename),
+    ['keep-me.epub']
+  );
 });
 
 test('libraryMaintenance lists and deletes only EPUB library files', async () => {

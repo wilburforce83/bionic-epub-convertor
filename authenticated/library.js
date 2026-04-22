@@ -7,6 +7,9 @@ $(document).ready(function () {
   const LIBRARY_FILTER_STORAGE_KEY = 'dyslibria:library-filter:v1';
   const LIBRARY_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
   const LIBRARY_RENDER_BATCH_SIZE = 24;
+  const GRID_INITIAL_RENDER_COUNT = 120;
+  const GRID_RENDER_INCREMENT = 120;
+  const SEARCH_INPUT_DEBOUNCE_MS = 140;
   const UPLOAD_BATCH_MAX_BYTES = 32 * 1024 * 1024;
   const UPLOAD_BATCH_MAX_FILES = 12;
   const DEFAULT_VIEW_MODE = 'shelves';
@@ -56,6 +59,7 @@ $(document).ready(function () {
     autoRefreshInFlight: false,
     pendingBookAction: null,
     noticeTimer: null,
+    searchDebounceTimer: null,
     libraryLoading: true,
     usingCachedLibrary: false,
     renderPassId: 0,
@@ -64,10 +68,26 @@ $(document).ready(function () {
     latestVersion: '',
     updateAvailable: false,
     updateNoticeShown: false,
+    metadataReady: false,
+    metadataRefreshing: false,
+    metadataUpdatedAtMs: 0,
     viewMode: localStorage.getItem(LIBRARY_VIEW_STORAGE_KEY) || DEFAULT_VIEW_MODE,
     sortMode: localStorage.getItem(LIBRARY_SORT_STORAGE_KEY) || DEFAULT_SORT_MODE,
     activeFilter: localStorage.getItem(LIBRARY_FILTER_STORAGE_KEY) || DEFAULT_FILTER_MODE,
-    selectedCollection: null
+    selectedCollection: null,
+    bookRevision: 0,
+    progressRevision: 0,
+    derivedBooks: {
+      decoratedKey: '',
+      decoratedBooks: [],
+      visibleKey: '',
+      visibleBooks: []
+    },
+    shelfCollections: new Map(),
+    gridObserver: null,
+    gridLoadMoreSentinel: null,
+    gridVisibleCount: 0,
+    gridAppendInFlight: false
   };
 
   const $app = $('#libraryApp');
@@ -251,6 +271,41 @@ $(document).ready(function () {
     localStorage.setItem(LIBRARY_FILTER_STORAGE_KEY, state.activeFilter);
   }
 
+  function invalidateDerivedBooks() {
+    state.derivedBooks.decoratedKey = '';
+    state.derivedBooks.decoratedBooks = [];
+    state.derivedBooks.visibleKey = '';
+    state.derivedBooks.visibleBooks = [];
+  }
+
+  function setBooks(nextBooks) {
+    state.books = Array.isArray(nextBooks) ? nextBooks.filter(function (book) {
+      return Boolean(book && book.filename);
+    }) : [];
+    state.bookRevision += 1;
+    state.shelfCollections = new Map();
+    invalidateDerivedBooks();
+  }
+
+  function setProgressEntries(nextEntries) {
+    state.progressEntries = Array.isArray(nextEntries) ? nextEntries.filter(function (entry) {
+      return Boolean(entry && entry.filename);
+    }) : [];
+    state.latestProgress = state.progressEntries[0] || null;
+    state.progressRevision += 1;
+    invalidateDerivedBooks();
+  }
+
+  function buildCollectionCacheKey(collection) {
+    const filenames = collection && Array.isArray(collection.filenames) ? collection.filenames : [];
+    return [
+      String(collection && collection.key || 'selected'),
+      filenames.length,
+      filenames[0] || '',
+      filenames[filenames.length - 1] || ''
+    ].join(':');
+  }
+
   function normalizeTimestamp(value) {
     const timestamp = Date.parse(value || '');
     return Number.isFinite(timestamp) ? timestamp : 0;
@@ -303,6 +358,11 @@ $(document).ready(function () {
   }
 
   function getDecoratedBooks() {
+    const decoratedKey = `${state.bookRevision}:${state.progressRevision}`;
+    if (state.derivedBooks.decoratedKey === decoratedKey) {
+      return state.derivedBooks.decoratedBooks;
+    }
+
     const progressByFilename = getProgressByFilename();
     const authorCounts = state.books.reduce(function (counts, book) {
       const authorKey = String(book.author || 'Unknown author').trim().toLowerCase();
@@ -311,7 +371,7 @@ $(document).ready(function () {
     }, new Map());
     const recentlyAddedCutoff = Date.now() - RECENTLY_ADDED_WINDOW_MS;
 
-    return state.books.map(function (book) {
+    const decoratedBooks = state.books.map(function (book) {
       const progress = progressByFilename.get(book.filename) || null;
       const displayTitle = book.title || book.filename || 'Untitled';
       const displayAuthor = book.author || 'Unknown author';
@@ -341,6 +401,10 @@ $(document).ready(function () {
         authorBookCount: authorCounts.get(authorKey) || 0
       };
     });
+
+    state.derivedBooks.decoratedKey = decoratedKey;
+    state.derivedBooks.decoratedBooks = decoratedBooks;
+    return decoratedBooks;
   }
 
   function getActiveCollectionFilenameSet() {
@@ -351,8 +415,26 @@ $(document).ready(function () {
     return new Set(state.selectedCollection.filenames);
   }
 
+  function getSelectedCollectionCacheKey() {
+    return state.selectedCollection
+      ? String(state.selectedCollection.cacheKey || state.selectedCollection.key || 'selected')
+      : 'all';
+  }
+
   function getVisibleBooks() {
     const query = String(state.query || '').trim().toLowerCase();
+    const visibleKey = [
+      state.derivedBooks.decoratedKey || `${state.bookRevision}:${state.progressRevision}`,
+      state.activeFilter,
+      state.sortMode,
+      query,
+      getSelectedCollectionCacheKey()
+    ].join('|');
+
+    if (state.derivedBooks.visibleKey === visibleKey) {
+      return state.derivedBooks.visibleBooks;
+    }
+
     const activeCollectionSet = getActiveCollectionFilenameSet();
     const books = getDecoratedBooks().filter(function (book) {
       if (activeCollectionSet && !activeCollectionSet.has(book.filename)) {
@@ -382,7 +464,7 @@ $(document).ready(function () {
       return true;
     });
 
-    return books.sort(function (left, right) {
+    const visibleBooks = books.sort(function (left, right) {
       if (state.sortMode === 'title-asc') {
         return left.displayTitle.localeCompare(right.displayTitle, undefined, { sensitivity: 'base' }) ||
           left.displayAuthor.localeCompare(right.displayAuthor, undefined, { sensitivity: 'base' });
@@ -403,6 +485,10 @@ $(document).ready(function () {
         (right.progressUpdatedAtMs - left.progressUpdatedAtMs) ||
         left.displayTitle.localeCompare(right.displayTitle, undefined, { sensitivity: 'base' });
     });
+
+    state.derivedBooks.visibleKey = visibleKey;
+    state.derivedBooks.visibleBooks = visibleBooks;
+    return visibleBooks;
   }
 
   function buildShelfCollection(key, caption, title, meta, books) {
@@ -412,7 +498,9 @@ $(document).ready(function () {
       title,
       meta,
       books: books.slice(0, 12),
-      allBooks: books.slice()
+      filenames: books.map(function (book) {
+        return book.filename;
+      })
     };
   }
 
@@ -1020,6 +1108,12 @@ $(document).ready(function () {
   }
 
   function getLibraryMetaCopy(visibleCount, totalCount) {
+    if (!state.metadataReady) {
+      return state.books.length > 0
+        ? 'Showing your saved shelf while Dyslibria rebuilds the library index in the background.'
+        : 'Dyslibria is building the initial library index in the background.';
+    }
+
     if (state.libraryLoading && totalCount > 0) {
       return state.usingCachedLibrary
         ? 'Showing your saved shelf while Dyslibria checks the server for updates.'
@@ -1339,16 +1433,10 @@ $(document).ready(function () {
       .addClass('shelf-action')
       .attr({
         type: 'button',
-        'data-action': 'see-all'
-      })
-      .text('See all')
-      .data('collection', {
-        key: collection.key,
-        title: collection.title,
-        filenames: collection.allBooks.map(function (book) {
-          return book.filename;
-        })
+        'data-action': 'see-all',
+        'data-collection-key': collection.key
       });
+    $seeAll.text('See all');
     const $previous = $('<button>')
       .addClass('shelf-nav')
       .attr({
@@ -1382,17 +1470,43 @@ $(document).ready(function () {
 
   function renderShelfCollections(collections) {
     const fragment = document.createDocumentFragment();
+    state.shelfCollections = new Map();
     collections.forEach(function (collection) {
+      state.shelfCollections.set(collection.key, collection);
       fragment.appendChild(createShelfRow(collection).get(0));
     });
     $shelfStack.empty().append(fragment);
   }
 
-  function renderGridBooks(books, renderPassId) {
+  function clearGridProgressiveRendering() {
+    if (state.gridObserver) {
+      state.gridObserver.disconnect();
+      state.gridObserver = null;
+    }
+
+    state.gridVisibleCount = 0;
+    state.gridAppendInFlight = false;
+
+    if (state.gridLoadMoreSentinel) {
+      $(state.gridLoadMoreSentinel).remove();
+      state.gridLoadMoreSentinel = null;
+    }
+  }
+
+  function createGridLoadMoreSentinel(totalCount, renderedCount) {
+    const remainingCount = Math.max(0, totalCount - renderedCount);
+    return $('<button>')
+      .addClass('library-grid-sentinel')
+      .attr({
+        type: 'button'
+      })
+      .text(`Load ${Math.min(remainingCount, GRID_RENDER_INCREMENT)} more books (${remainingCount} remaining)`);
+  }
+
+  function appendGridBookRange(books, startIndex, endIndex, variant, renderPassId) {
     const deferred = $.Deferred();
     const gridElement = $cards.get(0);
-    const variant = state.viewMode === 'compact' ? 'compact' : 'standard';
-    let index = 0;
+    let index = startIndex;
 
     function appendChunk() {
       if (renderPassId !== state.renderPassId) {
@@ -1401,7 +1515,7 @@ $(document).ready(function () {
       }
 
       const fragment = document.createDocumentFragment();
-      const chunkLimit = Math.min(index + LIBRARY_RENDER_BATCH_SIZE, books.length);
+      const chunkLimit = Math.min(index + LIBRARY_RENDER_BATCH_SIZE, endIndex);
 
       for (; index < chunkLimit; index += 1) {
         fragment.appendChild(createCard(books[index], { variant }).get(0));
@@ -1409,7 +1523,7 @@ $(document).ready(function () {
 
       gridElement.appendChild(fragment);
 
-      if (index < books.length) {
+      if (index < endIndex) {
         window.requestAnimationFrame(appendChunk);
         return;
       }
@@ -1421,12 +1535,118 @@ $(document).ready(function () {
     return deferred.promise();
   }
 
+  function renderGridBooks(books, renderPassId) {
+    const deferred = $.Deferred();
+    const totalCount = books.length;
+    const variant = state.viewMode === 'compact' ? 'compact' : 'standard';
+
+    clearGridProgressiveRendering();
+
+    function installLoadMoreSentinel() {
+      if (renderPassId !== state.renderPassId || state.gridVisibleCount >= totalCount) {
+        return;
+      }
+
+      const $sentinel = createGridLoadMoreSentinel(totalCount, state.gridVisibleCount);
+
+      $sentinel.on('click', function () {
+        loadMoreBooks();
+      });
+
+      $cards.append($sentinel);
+      state.gridLoadMoreSentinel = $sentinel.get(0);
+
+      if (typeof window.IntersectionObserver !== 'function') {
+        return;
+      }
+
+      state.gridObserver = new window.IntersectionObserver(function (entries) {
+        if (entries.some(function (entry) { return entry.isIntersecting; })) {
+          loadMoreBooks();
+        }
+      }, {
+        rootMargin: '320px 0px'
+      });
+      state.gridObserver.observe(state.gridLoadMoreSentinel);
+    }
+
+    function loadMoreBooks() {
+      if (renderPassId !== state.renderPassId || state.gridAppendInFlight) {
+        return;
+      }
+
+      const nextCount = Math.min(state.gridVisibleCount + GRID_RENDER_INCREMENT, totalCount);
+      if (nextCount <= state.gridVisibleCount) {
+        return;
+      }
+
+      state.gridAppendInFlight = true;
+
+      if (state.gridObserver) {
+        state.gridObserver.disconnect();
+        state.gridObserver = null;
+      }
+
+      if (state.gridLoadMoreSentinel) {
+        $(state.gridLoadMoreSentinel)
+          .prop('disabled', true)
+          .text('Loading more books…');
+      }
+
+      appendGridBookRange(books, state.gridVisibleCount, nextCount, variant, renderPassId).always(function () {
+        if (renderPassId !== state.renderPassId) {
+          deferred.resolve();
+          return;
+        }
+
+        state.gridVisibleCount = nextCount;
+        state.gridAppendInFlight = false;
+
+        if (state.gridLoadMoreSentinel) {
+          $(state.gridLoadMoreSentinel).remove();
+          state.gridLoadMoreSentinel = null;
+        }
+
+        installLoadMoreSentinel();
+
+        if (state.gridVisibleCount >= totalCount) {
+          deferred.resolve();
+        }
+      });
+    }
+
+    state.gridVisibleCount = 0;
+    const initialCount = Math.min(totalCount, GRID_INITIAL_RENDER_COUNT);
+    const initialTarget = initialCount > 0 ? initialCount : totalCount;
+
+    if (initialTarget <= 0) {
+      deferred.resolve();
+      return deferred.promise();
+    }
+
+    state.gridAppendInFlight = true;
+    appendGridBookRange(books, 0, initialTarget, variant, renderPassId).always(function () {
+      if (renderPassId !== state.renderPassId) {
+        deferred.resolve();
+        return;
+      }
+
+      state.gridVisibleCount = initialTarget;
+      state.gridAppendInFlight = false;
+      installLoadMoreSentinel();
+      deferred.resolve();
+    });
+
+    return deferred.promise();
+  }
+
   function renderBooks() {
     const visibleBooks = getVisibleBooks();
     const renderPassId = state.renderPassId + 1;
     const deferred = $.Deferred();
 
     state.renderPassId = renderPassId;
+    clearGridProgressiveRendering();
     closeCardMenus();
     $cards.empty();
     $cards.toggleClass('is-compact', state.viewMode === 'compact');
@@ -1499,12 +1719,37 @@ $(document).ready(function () {
     $continueButton.prop('disabled', false);
   }
 
+  function applyMetadataLoadingState() {
+    if (state.metadataReady) {
+      return;
+    }
+
+    setLibraryLoadingState(true, {
+      title: state.books.length > 0 ? 'Refreshing your library' : 'Indexing your library',
+      text: state.books.length > 0
+        ? 'Showing your saved shelf while Dyslibria rebuilds the library index in the background.'
+        : 'Dyslibria is building the first library index in the background. Large shelves can take a while, but the app is already online.'
+    });
+  }
+
   function applySystemStatus(status) {
     const previousStatus = state.status;
     const wasBusy = Boolean(previousStatus && (previousStatus.processing || previousStatus.queueLength > 0));
     const isBusy = Boolean(status && (status.processing || status.queueLength > 0));
+    const previousMetadataReady = state.metadataReady;
+    const previousMetadataUpdatedAtMs = state.metadataUpdatedAtMs;
+    const nextMetadataReady = Boolean(status && status.metadataReady);
+    const nextMetadataRefreshing = Boolean(status && status.metadataRefreshing);
+    const nextMetadataUpdatedAtMs = Number(status && status.metadataUpdatedAtMs) || 0;
+    const metadataBecameReady = !previousMetadataReady && nextMetadataReady;
+    const metadataChanged = previousMetadataUpdatedAtMs > 0 &&
+      nextMetadataUpdatedAtMs > 0 &&
+      previousMetadataUpdatedAtMs !== nextMetadataUpdatedAtMs;
 
     state.status = status;
+    state.metadataReady = nextMetadataReady;
+    state.metadataRefreshing = nextMetadataRefreshing;
+    state.metadataUpdatedAtMs = nextMetadataUpdatedAtMs;
 
     $conversionStatus.removeClass('is-processing is-idle is-attention');
 
@@ -1515,11 +1760,32 @@ $(document).ready(function () {
       triggerAutomaticLibraryRefresh();
     }
 
+    if (!nextMetadataReady && !state.autoRefreshInFlight) {
+      applyMetadataLoadingState();
+    }
+
+    if (previousStatus && !state.autoRefreshInFlight && (metadataBecameReady || metadataChanged)) {
+      triggerAutomaticLibraryRefresh();
+    }
+
     if (state.autoRefreshInFlight) {
       $conversionStatus.addClass('is-processing');
       $conversionStatusText.text('Refreshing library');
       $heroStatusText.text('Refreshing library');
       $heroStatusMeta.text('Refreshing the dashboard now that conversion work has finished.');
+      $viewLogsLabel.text(status.logCount > 0 ? `Logs (${status.logCount})` : 'Logs');
+      return;
+    }
+
+    if (!nextMetadataReady && !status.processing && !(status.queueLength > 0)) {
+      $conversionStatus.addClass('is-processing');
+      $conversionStatusText.text('Indexing library');
+      $heroStatusText.text('Indexing library');
+      $heroStatusMeta.text(
+        state.books.length > 0
+          ? 'Showing your saved shelf while Dyslibria reconciles the library in the background.'
+          : 'Building the initial library index. Large shelves can take a while on first run.'
+      );
       $viewLogsLabel.text(status.logCount > 0 ? `Logs (${status.logCount})` : 'Logs');
       return;
     }
@@ -1621,6 +1887,7 @@ $(document).ready(function () {
       key: collection.key || 'selected',
       title: collection.title || 'Selected books',
       filenames: collection.filenames.slice(),
+      cacheKey: buildCollectionCacheKey(collection),
       returnViewMode: state.viewMode
     };
     state.viewMode = 'grid';
@@ -1632,6 +1899,10 @@ $(document).ready(function () {
 
   function clearBrowseState() {
     const returnViewMode = state.selectedCollection && state.selectedCollection.returnViewMode;
+    if (state.searchDebounceTimer) {
+      window.clearTimeout(state.searchDebounceTimer);
+      state.searchDebounceTimer = null;
+    }
     state.selectedCollection = null;
     state.activeFilter = DEFAULT_FILTER_MODE;
     state.query = '';
@@ -1661,54 +1932,81 @@ $(document).ready(function () {
   function hydrateLibraryFromCache() {
     const cachedBooks = readLibrarySnapshot();
     if (!cachedBooks.length) {
-      setLibraryLoadingState(true, {
-        title: 'Loading your library',
-        text: 'Gathering your books and preparing the shelf.'
-      });
+      applyMetadataLoadingState();
       return false;
     }
 
-    state.books = cachedBooks;
+    setBooks(cachedBooks);
     state.usingCachedLibrary = true;
     renderBooks();
-    setLibraryLoadingState(true, {
-      title: 'Refreshing your library',
-      text: 'Showing your saved shelf while Dyslibria checks the server for updates.'
-    });
+    applyMetadataLoadingState();
     return true;
   }
 
   function loadBooks() {
     if (!state.books.length) {
-      setLibraryLoadingState(true, {
-        title: 'Loading your library',
-        text: 'Gathering your books and preparing the shelf.'
-      });
+      applyMetadataLoadingState();
     } else {
       setLibraryLoadingState(true, {
         title: 'Refreshing your library',
-        text: state.usingCachedLibrary
+        text: !state.metadataReady
+          ? 'Showing your saved shelf while Dyslibria rebuilds the library index in the background.'
+          : state.usingCachedLibrary
           ? 'Showing your saved shelf while Dyslibria checks the server for updates.'
           : 'Checking the server for the latest library changes.'
       });
     }
 
-    return $.get('/epubs').then(function (books) {
+    return $.ajax({
+      url: '/epubs',
+      method: 'GET',
+      dataType: 'json'
+    }).then(function (books, _textStatus, jqXHR) {
       const normalizedBooks = Array.isArray(books) ? books.map(normalizeBook) : [];
-      state.books = normalizedBooks.filter(function (book) {
+      const nextBooks = normalizedBooks.filter(function (book) {
         return Boolean(book.filename);
       });
+      const metadataReadyHeader = jqXHR && jqXHR.getResponseHeader
+        ? jqXHR.getResponseHeader('X-Dyslibria-Metadata-Ready')
+        : '';
+      const metadataRefreshingHeader = jqXHR && jqXHR.getResponseHeader
+        ? jqXHR.getResponseHeader('X-Dyslibria-Metadata-Refreshing')
+        : '';
+      const metadataUpdatedAtHeader = jqXHR && jqXHR.getResponseHeader
+        ? jqXHR.getResponseHeader('X-Dyslibria-Metadata-Updated-At')
+        : '';
+
+      if (metadataReadyHeader) {
+        state.metadataReady = metadataReadyHeader === '1';
+      }
+
+      if (metadataRefreshingHeader) {
+        state.metadataRefreshing = metadataRefreshingHeader === '1';
+      }
+
+      if (metadataUpdatedAtHeader) {
+        state.metadataUpdatedAtMs = Number(metadataUpdatedAtHeader) || state.metadataUpdatedAtMs;
+      }
+
+      if (!nextBooks.length && !state.metadataReady) {
+        renderBooks();
+        applyMetadataLoadingState();
+        return $.Deferred().resolve().promise();
+      }
+
+      setBooks(nextBooks);
       state.usingCachedLibrary = false;
       persistLibrarySnapshot(state.books);
 
       return renderBooks().always(function () {
         setLibraryLoadingState(false);
-        if (!getVisibleBooks().length) {
-          renderBooks();
-        }
       });
     }).catch(function (xhr) {
-      setLibraryLoadingState(false);
+      if (state.metadataReady) {
+        setLibraryLoadingState(false);
+      } else {
+        applyMetadataLoadingState();
+      }
 
       if (!state.books.length) {
         renderBooks();
@@ -1728,17 +2026,15 @@ $(document).ready(function () {
   function loadReadingProgress() {
     return $.get('/api/reading-progress').then(function (payload) {
       const progressEntries = Array.isArray(payload && payload.progress) ? payload.progress : [];
-      state.progressEntries = progressEntries.map(normalizeProgressEntry).filter(function (entry) {
+      setProgressEntries(progressEntries.map(normalizeProgressEntry).filter(function (entry) {
         return Boolean(entry.filename);
-      });
-      state.latestProgress = state.progressEntries[0] || null;
+      }));
       renderContinueCard();
       if (state.books.length) {
         renderBooks();
       }
     }).catch(function () {
-      state.progressEntries = [];
-      state.latestProgress = null;
+      setProgressEntries([]);
       renderContinueCard();
       if (state.books.length) {
         renderBooks();
@@ -1747,10 +2043,11 @@ $(document).ready(function () {
   }
 
   function loadSession() {
+    const previousCanDelete = canDeleteBooks();
     return $.get('/api/session').then(function (payload) {
       state.session = payload || null;
       applySessionCapabilities();
-      if (state.books.length) {
+      if (state.books.length && previousCanDelete !== canDeleteBooks()) {
         renderBooks();
       }
       loadUpdateStatus();
@@ -1758,7 +2055,7 @@ $(document).ready(function () {
     }).catch(function () {
       state.session = null;
       applySessionCapabilities();
-      if (state.books.length) {
+      if (state.books.length && previousCanDelete !== canDeleteBooks()) {
         renderBooks();
       }
     });
@@ -1986,7 +2283,8 @@ $(document).ready(function () {
     });
 
     $app.on('click', '.shelf-action[data-action="see-all"]', function () {
-      activateCollectionBrowse($(this).data('collection'));
+      const collectionKey = String($(this).data('collectionKey') || '');
+      activateCollectionBrowse(state.shelfCollections.get(collectionKey));
     });
 
     $app.on('click', '.shelf-nav', function () {
@@ -2073,8 +2371,15 @@ $(document).ready(function () {
     });
 
     $searchBar.on('input', function () {
-      state.query = $(this).val() || '';
-      renderBooks();
+      const nextQuery = $(this).val() || '';
+      if (state.searchDebounceTimer) {
+        window.clearTimeout(state.searchDebounceTimer);
+      }
+      state.searchDebounceTimer = window.setTimeout(function () {
+        state.searchDebounceTimer = null;
+        state.query = nextQuery;
+        renderBooks();
+      }, SEARCH_INPUT_DEBOUNCE_MS);
     });
 
     $themeToggle.on('click', function () {

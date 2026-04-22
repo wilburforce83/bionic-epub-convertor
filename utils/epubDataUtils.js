@@ -28,12 +28,46 @@ function isEpubFilename(fileName) {
   return /\.epub$/i.test(fileName);
 }
 
+function buildFileSignature(fileStat) {
+  return `${Number(fileStat && fileStat.size) || 0}:${Math.round(Number(fileStat && fileStat.mtimeMs) || 0)}`;
+}
+
+function getEntrySignature(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return '';
+  }
+
+  if (entry.coverVersion) {
+    return String(entry.coverVersion);
+  }
+
+  const size = Number(entry.fileSizeBytes) || 0;
+  const sourceMtimeMs = Math.round(Number(entry.sourceMtimeMs) || 0);
+  if (size || sourceMtimeMs) {
+    return `${size}:${sourceMtimeMs}`;
+  }
+
+  const parsedLastModified = Date.parse(entry.lastModified || '');
+  if (Number.isFinite(parsedLastModified)) {
+    return `${size}:${Math.round(parsedLastModified)}`;
+  }
+
+  return '';
+}
+
+function isCacheEntryCurrent(entry, fileStat) {
+  return getEntrySignature(entry) === buildFileSignature(fileStat);
+}
+
 function getDefaultMetaData(file, fileStat, metadataRefreshedAt) {
   return {
     filename: file,
     title: file.replace(/\.epub$/i, ''),
     author: '',
     cover: `data:image/png;base64,${defaultBase64Image}`,
+    coverVersion: buildFileSignature(fileStat),
+    fileSizeBytes: Number(fileStat.size) || 0,
+    sourceMtimeMs: Math.round(Number(fileStat.mtimeMs) || 0),
     lastModified: fileStat.mtime.toISOString(),
     metadataRefreshedAt,
     isValid: true
@@ -269,89 +303,41 @@ function extractOpfMetaData(opfEntryName, content) {
   return metaData;
 }
 
-async function extractEpubData(processedDir, options = {}) {
-  const epubDataPath = resolveEpubDataPath(options.cachePath);
-  await fs.ensureDir(path.dirname(epubDataPath));
-
-  const epubFiles = await fs.readdir(processedDir);
-  const epubData = [];
-  const metadataRefreshedAt = new Date().toISOString();
-
-  for (const file of epubFiles) {
-    const filePath = path.join(processedDir, file);
-    const fileStat = await fs.stat(filePath);
-
-    if (!fileStat.isFile() || !isEpubFilename(file)) {
-      continue;
-    }
-
-    const metaData = getDefaultMetaData(file, fileStat, metadataRefreshedAt);
-
-    try {
-      const zip = new AdmZip(filePath);
-      const zipEntries = zip.getEntries();
-      const entryMap = new Map();
-      let explicitCoverEntryName = '';
-
-      for (const entry of zipEntries) {
-        const normalizedEntryName = normalizeArchivePath(entry.entryName);
-        const entryName = normalizedEntryName.toLowerCase();
-        entryMap.set(entryName, entry);
-
-        if (entryName.endsWith('.opf')) {
-          const content = zip.readAsText(entry);
-          const opfMetaData = extractOpfMetaData(normalizedEntryName, content);
-
-          if (opfMetaData.title) {
-            metaData.title = opfMetaData.title;
-          }
-
-          if (opfMetaData.author) {
-            metaData.author = opfMetaData.author;
-          }
-
-          if (!explicitCoverEntryName && opfMetaData.coverEntryName) {
-            explicitCoverEntryName = opfMetaData.coverEntryName.toLowerCase();
-          }
-        }
-      }
-
-      const explicitCoverEntry = explicitCoverEntryName ? entryMap.get(explicitCoverEntryName) : null;
-      if (explicitCoverEntry) {
-        const explicitCover = await tryReadCover(zip, explicitCoverEntry);
-        if (explicitCover) {
-          metaData.cover = explicitCover.value;
-        }
-      } else {
-        const fallbackCoverCandidates = buildFallbackCoverCandidates(zipEntries);
-
-        for (const entry of fallbackCoverCandidates) {
-          const fallbackCover = await tryReadCover(zip, entry);
-          if (!fallbackCover) {
-            continue;
-          }
-
-          metaData.cover = fallbackCover.value;
-          break;
-        }
-      }
-    } catch (error) {
-      metaData.isValid = false;
-      metaData.processingError = error.message;
-      console.error(`Error processing file ${filePath}: ${error.message}`);
-    }
-
-    epubData.push(metaData);
-  }
-
-  await fs.writeJson(epubDataPath, epubData, { spaces: 2 });
+function sortEpubData(entries) {
+  return entries.slice().sort((left, right) => (
+    String(left && left.filename || '').localeCompare(String(right && right.filename || ''), undefined, {
+      sensitivity: 'base'
+    })
+  ));
 }
 
-async function getEpubs(options = {}) {
-  const { includeInvalid = false, cachePath } = options;
-  const data = await readCachedEpubData(cachePath);
+function haveEntriesChanged(previousEntry, nextEntry) {
+  if (!previousEntry && nextEntry) {
+    return true;
+  }
 
-  return includeInvalid ? data : data.filter((epub) => epub.isValid !== false);
+  if (previousEntry && !nextEntry) {
+    return true;
+  }
+
+  return JSON.stringify(previousEntry || null) !== JSON.stringify(nextEntry || null);
+}
+
+async function writeCachedEpubData(cachePath, data) {
+  const epubDataPath = resolveEpubDataPath(cachePath);
+  const sortedData = sortEpubData(Array.isArray(data) ? data : []);
+
+  await fs.ensureDir(path.dirname(epubDataPath));
+  await fs.writeJson(epubDataPath, sortedData, { spaces: 2 });
+
+  const fileStat = await fs.stat(epubDataPath);
+  epubMetadataCache.set(epubDataPath, {
+    mtimeMs: fileStat.mtimeMs,
+    size: fileStat.size,
+    data: sortedData
+  });
+
+  return sortedData;
 }
 
 async function readCachedEpubData(cachePath) {
@@ -401,6 +387,156 @@ async function readCachedEpubData(cachePath) {
   return data;
 }
 
+async function extractMetadataForFile(filePath, fileStat) {
+  const resolvedFileStat = fileStat || await fs.stat(filePath);
+  const fileName = path.basename(filePath);
+  const metadataRefreshedAt = new Date().toISOString();
+  const metaData = getDefaultMetaData(fileName, resolvedFileStat, metadataRefreshedAt);
+
+  try {
+    const zip = new AdmZip(filePath);
+    const zipEntries = zip.getEntries();
+    const entryMap = new Map();
+    let explicitCoverEntryName = '';
+
+    for (const entry of zipEntries) {
+      const normalizedEntryName = normalizeArchivePath(entry.entryName);
+      const entryName = normalizedEntryName.toLowerCase();
+      entryMap.set(entryName, entry);
+
+      if (entryName.endsWith('.opf')) {
+        const content = zip.readAsText(entry);
+        const opfMetaData = extractOpfMetaData(normalizedEntryName, content);
+
+        if (opfMetaData.title) {
+          metaData.title = opfMetaData.title;
+        }
+
+        if (opfMetaData.author) {
+          metaData.author = opfMetaData.author;
+        }
+
+        if (!explicitCoverEntryName && opfMetaData.coverEntryName) {
+          explicitCoverEntryName = opfMetaData.coverEntryName.toLowerCase();
+        }
+      }
+    }
+
+    const explicitCoverEntry = explicitCoverEntryName ? entryMap.get(explicitCoverEntryName) : null;
+    if (explicitCoverEntry) {
+      const explicitCover = await tryReadCover(zip, explicitCoverEntry);
+      if (explicitCover) {
+        metaData.cover = explicitCover.value;
+      }
+    } else {
+      const fallbackCoverCandidates = buildFallbackCoverCandidates(zipEntries);
+
+      for (const entry of fallbackCoverCandidates) {
+        const fallbackCover = await tryReadCover(zip, entry);
+        if (!fallbackCover) {
+          continue;
+        }
+
+        metaData.cover = fallbackCover.value;
+        break;
+      }
+    }
+  } catch (error) {
+    metaData.isValid = false;
+    metaData.processingError = error.message;
+    console.error(`Error processing file ${filePath}: ${error.message}`);
+  }
+
+  return metaData;
+}
+
+async function extractEpubData(processedDir, options = {}) {
+  const previousEntries = await readCachedEpubData(options.cachePath);
+  const previousEntriesByFilename = new Map(previousEntries.map((entry) => [entry.filename, entry]));
+  const directoryEntries = await fs.readdir(processedDir).catch((error) => {
+    if (error && error.code === 'ENOENT') {
+      return [];
+    }
+
+    throw error;
+  });
+  const nextEntries = [];
+  let cacheChanged = previousEntries.length !== directoryEntries.filter(isEpubFilename).length;
+
+  for (const file of directoryEntries.sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' }))) {
+    const filePath = path.join(processedDir, file);
+    const fileStat = await fs.stat(filePath);
+
+    if (!fileStat.isFile() || !isEpubFilename(file)) {
+      continue;
+    }
+
+    const previousEntry = previousEntriesByFilename.get(file);
+    if (!options.force && previousEntry && isCacheEntryCurrent(previousEntry, fileStat)) {
+      nextEntries.push(previousEntry);
+      continue;
+    }
+
+    const nextEntry = await extractMetadataForFile(filePath, fileStat);
+    cacheChanged = cacheChanged || haveEntriesChanged(previousEntry, nextEntry);
+    nextEntries.push(nextEntry);
+  }
+
+  if (!cacheChanged && previousEntries.length === nextEntries.length) {
+    return sortEpubData(previousEntries);
+  }
+
+  return writeCachedEpubData(options.cachePath, nextEntries);
+}
+
+async function upsertEpubMetadataForFile(processedDir, filename, options = {}) {
+  if (!isEpubFilename(filename)) {
+    return null;
+  }
+
+  const filePath = path.join(processedDir, filename);
+  const fileStat = await fs.stat(filePath);
+  if (!fileStat.isFile()) {
+    return null;
+  }
+
+  const previousEntries = await readCachedEpubData(options.cachePath);
+  const previousEntry = previousEntries.find((entry) => entry.filename === filename) || null;
+
+  if (!options.force && previousEntry && isCacheEntryCurrent(previousEntry, fileStat)) {
+    return previousEntry;
+  }
+
+  const nextEntry = await extractMetadataForFile(filePath, fileStat);
+  if (previousEntry && !haveEntriesChanged(previousEntry, nextEntry)) {
+    return previousEntry;
+  }
+
+  const nextEntries = previousEntries.filter((entry) => entry.filename !== filename);
+  nextEntries.push(nextEntry);
+  await writeCachedEpubData(options.cachePath, nextEntries);
+  return nextEntry;
+}
+
+async function removeEpubMetadataForFile(filename, options = {}) {
+  const previousEntries = await readCachedEpubData(options.cachePath);
+  const nextEntries = previousEntries.filter((entry) => entry.filename !== filename);
+
+  if (nextEntries.length === previousEntries.length) {
+    return false;
+  }
+
+  await writeCachedEpubData(options.cachePath, nextEntries);
+  return true;
+}
+
+async function getEpubs(options = {}) {
+  const { includeInvalid = false, cachePath } = options;
+  const data = await readCachedEpubData(cachePath);
+
+  return includeInvalid ? data : data.filter((epub) => epub.isValid !== false);
+}
+
 async function getEpubByFilename(filename, options = {}) {
   const epubs = await getEpubs({
     includeInvalid: options.includeInvalid,
@@ -410,4 +546,10 @@ async function getEpubByFilename(filename, options = {}) {
   return epubs.find((epub) => epub && epub.filename === filename) || null;
 }
 
-module.exports = { extractEpubData, getEpubs, getEpubByFilename };
+module.exports = {
+  extractEpubData,
+  upsertEpubMetadataForFile,
+  removeEpubMetadataForFile,
+  getEpubs,
+  getEpubByFilename
+};

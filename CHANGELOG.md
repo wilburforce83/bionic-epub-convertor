@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.17 - 2026-04-22
+
+### Added
+
+- persistent on-disk session storage so production containers no longer rely on Express's in-memory `MemoryStore`
+- incremental metadata cache maintenance and regression tests for single-book upserts, removals, and warm-cache reuse
+
+### Changed
+
+- stopped blocking server startup on a full library metadata rebuild and moved startup reconciliation into the background
+- rebuilt the EPUB metadata cache flow so unchanged books keep their existing cached cover previews and metadata instead of being re-extracted on every boot, refresh, upload, or delete
+- stabilized cover cache versioning per book so a normal metadata reconcile no longer invalidates every cover URL across the whole library
+- enabled gzip compression on app responses and added metadata-ready headers to the library catalog endpoint for warmer startup behavior
+- reworked the library browser for large shelves with memoized derived book lists, debounced search, lighter shelf collection state, and progressive infinite rendering in grid and compact views instead of mounting every card at once
+
 ## 1.0.16 - 2026-04-22
 
 ### Fixed
