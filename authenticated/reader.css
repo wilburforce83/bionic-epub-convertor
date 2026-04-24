@@ -71,7 +71,11 @@ input {
 .viewer-frame {
   overflow: hidden;
   background: var(--reader-page-bg);
-  padding: var(--reader-page-block-margin, 5.7%) var(--reader-page-inline-margin, 6.5%);
+  padding:
+    calc(var(--reader-page-block-margin, 5.7%) + env(safe-area-inset-top))
+    calc(var(--reader-page-inline-margin, 6.5%) + env(safe-area-inset-right))
+    calc(var(--reader-page-block-margin, 5.7%) + env(safe-area-inset-bottom))
+    calc(var(--reader-page-inline-margin, 6.5%) + env(safe-area-inset-left));
   transition: padding 150ms ease;
 }
 

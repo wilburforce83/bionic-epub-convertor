@@ -159,7 +159,6 @@
     pageMarginInput: document.getElementById('pageMarginInput'),
     pageMarginValue: document.getElementById('pageMarginValue'),
     layoutSelect: document.getElementById('layoutSelect'),
-    flowSelect: document.getElementById('flowSelect'),
     disableDyslibriaInput: document.getElementById('disableDyslibriaInput')
   };
 
@@ -279,6 +278,7 @@
 
   const settings = parseStoredJson(SETTINGS_STORAGE_KEY, defaultSettings);
   settings.fontFamily = normalizeFontFamilyKey(settings.fontFamily);
+  settings.flow = 'paginated';
   settings.disableDyslibria = Boolean(settings.disableDyslibria);
 
   function persistSettings() {
@@ -381,7 +381,6 @@
     elements.lineHeightInput.value = settings.lineHeight;
     elements.pageMarginInput.value = settings.pageMargin;
     elements.layoutSelect.value = settings.layout;
-    elements.flowSelect.value = settings.flow;
     elements.disableDyslibriaInput.checked = settings.disableDyslibria;
     elements.fontSizeValue.textContent = `${settings.fontSize}%`;
     elements.lineHeightValue.textContent = Number(settings.lineHeight).toFixed(1);
@@ -502,10 +501,6 @@
   }
 
   function getDisplaySpread() {
-    if (settings.flow === 'scrolled-doc') {
-      return 'none';
-    }
-
     if (settings.layout !== 'auto') {
       return settings.layout;
     }
@@ -869,7 +864,7 @@
     rendition.themes.default(themeRules);
 
     rendition.themes.fontSize(`${settings.fontSize}%`);
-    rendition.flow(settings.flow);
+    rendition.flow('paginated');
     rendition.spread(getDisplaySpread());
     updateOpenContentPresentationOverrides();
     resizeRendition();
@@ -1079,12 +1074,6 @@
 
     elements.layoutSelect.addEventListener('change', function () {
       settings.layout = this.value;
-      applyReaderSettings();
-      persistSettings();
-    });
-
-    elements.flowSelect.addEventListener('change', function () {
-      settings.flow = this.value;
       applyReaderSettings();
       persistSettings();
     });

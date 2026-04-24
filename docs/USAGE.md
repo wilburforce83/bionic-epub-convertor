@@ -257,9 +257,6 @@ Available reader settings:
   - Auto
   - Always show spreads
   - Single page only
-- Reading mode
-  - Paginated
-  - Continuous scroll
 
 ### Important theme behavior
 

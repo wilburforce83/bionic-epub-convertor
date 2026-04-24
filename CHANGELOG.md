@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.0 - 2026-04-24
+
+### Changed
+
+- added safe-area-aware reader padding so installed iPhone and iPad PWAs keep the reading surface comfortably below the camera slot and system status area
+- removed the reader's alternate reading-mode toggle so Dyslibria now stays paginated everywhere by design
+
 ## 1.0.19 - 2026-04-22
 
 ### Fixed
