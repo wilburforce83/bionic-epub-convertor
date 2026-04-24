@@ -189,14 +189,18 @@ input {
 .settings-panel {
   position: fixed;
   inset:
-    max(0.75rem, env(safe-area-inset-top))
+    max(0.75rem, calc(env(safe-area-inset-top) + 0.85rem))
     max(0.75rem, env(safe-area-inset-right))
     max(0.75rem, env(safe-area-inset-bottom))
     max(0.75rem, env(safe-area-inset-left));
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 1rem;
-  padding: clamp(1rem, 1vw + 0.9rem, 1.35rem);
+  padding:
+    calc(clamp(1rem, 1vw + 0.9rem, 1.35rem) + env(safe-area-inset-top))
+    calc(clamp(1rem, 1vw + 0.9rem, 1.35rem) + env(safe-area-inset-right))
+    calc(clamp(1rem, 1vw + 0.9rem, 1.35rem) + env(safe-area-inset-bottom))
+    calc(clamp(1rem, 1vw + 0.9rem, 1.35rem) + env(safe-area-inset-left));
   border: 1px solid var(--reader-border);
   border-radius: clamp(1rem, 2vw, 1.35rem);
   background: var(--reader-panel);

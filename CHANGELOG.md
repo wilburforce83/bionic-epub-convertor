@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.1 - 2026-04-24
+
+### Fixed
+
+- added extra safe-area-aware top spacing to the reader settings overlay so installed iPhone and iPad PWAs keep the settings content comfortably below the camera slot and status area
+
 ## 1.1.0 - 2026-04-24
 
 ### Changed
