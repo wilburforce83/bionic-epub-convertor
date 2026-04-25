@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.2 - 2026-04-25
+
+### Changed
+
+- refreshed the self-hosted library and settings chrome with the hosted Dyslibria glass treatment, including softer translucent panels, stronger top-bar and section surfaces, and more polished form controls
+- kept book covers and book-card edges less bevelled than the surrounding interface so the shelf still feels crisp while the wider UI takes on the newer glass styling
+
 ## 1.1.1 - 2026-04-24
 
 ### Fixed
