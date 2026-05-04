@@ -1072,7 +1072,6 @@
     const readerStyles = window.getComputedStyle(readerStyleSource);
     const fontFamily = fontFamilies[settings.fontFamily] || fontFamilies.accessible;
     const pageText = readerStyles.getPropertyValue('--reader-page-text').trim() || '#1b1a18';
-    const readerAccent = readerStyles.getPropertyValue('--reader-accent').trim() || '#d05834';
 
     const dyslibriaOffRules = settings.disableDyslibria
       ? `
@@ -1133,7 +1132,8 @@
 
       a,
       a:visited {
-        color: ${readerAccent} !important;
+        color: inherit !important;
+        text-decoration-color: currentColor !important;
       }
 
       .dyslibria-engine,
