@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.4 - 2026-05-06
+
+### Fixed
+
+- restored Docker image publishing for the packaged reader release by deferring the reader asset generation step until after the full app source has been copied into the image build context
+
 ## 1.2.3 - 2026-05-06
 
 ### Changed

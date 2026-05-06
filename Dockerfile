@@ -3,9 +3,10 @@ FROM node:24-bookworm-slim AS builder
 WORKDIR /usr/src/app
 
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --ignore-scripts
 
 COPY . .
+RUN npm run prepare:reader
 
 FROM node:24-bookworm-slim
 
