@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.5 - 2026-05-06
+
+### Fixed
+
+- corrected the packaged self-hosted reader bootstrap to load books from `/epub/:filename` instead of the `/epubs` catalog listing endpoint, which restores direct `reader.html?file=...` book opens
+
 ## 1.2.4 - 2026-05-06
 
 ### Fixed

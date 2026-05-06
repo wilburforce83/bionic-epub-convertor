@@ -20,7 +20,7 @@ const html = renderReaderDocument({
     bookQueryParam: 'file',
     bookIdTemplate: '{fileStem}',
     bookTitleTemplate: '{bookTitle}',
-    epubUrlTemplate: '/epubs/{file}',
+    epubUrlTemplate: '/epub/{file}',
     progressUrlTemplate: '/api/reading-progress/{file}',
     appConfigUrl: '/api/app-config',
     closeUrl: 'index.html',
