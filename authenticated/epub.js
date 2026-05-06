@@ -1,12 +1,5 @@
 (function webpackUniversalModuleDefinition(root, factory) {
-	if(typeof exports === 'object' && typeof module === 'object')
-		module.exports = factory(require("xmldom"), require("JSZip"));
-	else if(typeof define === 'function' && define.amd)
-		define(["xmldom", "JSZip"], factory);
-	else if(typeof exports === 'object')
-		exports["ePub"] = factory(require("xmldom"), require("JSZip"));
-	else
-		root["ePub"] = factory(root["xmldom"], root["JSZip"]);
+	root["ePub"] = factory(root["xmldom"], root["JSZip"]);
 })(window, function(__WEBPACK_EXTERNAL_MODULE__38__, __WEBPACK_EXTERNAL_MODULE__85__) {
 return /******/ (function(modules) { // webpackBootstrap
 /******/ 	// The module cache

@@ -1,156 +1,143 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Dyslibria Reader</title>
-  <link rel="manifest" href="/manifest.json">
-  <link rel="icon" href="/favicon.ico" sizes="any">
   <meta name="theme-color" content="#93381f">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Dyslibria">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet"
-    href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Figtree:wght@400;600;700&family=IBM+Plex+Sans:wght@400;600;700&family=Lexend:wght@400;600;700&family=Literata:wght@400;600;700&family=Merriweather+Sans:wght@400;700&family=Noto+Sans:wght@400;700&family=Nunito+Sans:wght@400;700&family=Public+Sans:wght@400;600;700&family=Source+Sans+3:wght@400;600;700&family=Source+Serif+4:wght@400;600;700&display=swap">
-  <link rel="stylesheet" type="text/css" href="semantic.min.css">
-  <link rel="stylesheet" type="text/css" href="reader.css">
-  <script defer src="jszip.min.js"></script>
-  <script defer src="epub.js"></script>
-  <script defer src="/app-theme.js"></script>
-  <script defer src="pwa.js"></script>
-  <script defer src="reader.js"></script>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&amp;family=Figtree:wght@400;600;700&amp;family=IBM+Plex+Sans:wght@400;600;700&amp;family=Lexend:wght@400;600;700&amp;family=Literata:wght@400;600;700&amp;family=Merriweather+Sans:wght@400;700&amp;family=Noto+Sans:wght@400;700&amp;family=Nunito+Sans:wght@400;700&amp;family=Public+Sans:wght@400;600;700&amp;family=Source+Sans+3:wght@400;600;700&amp;family=Source+Serif+4:wght@400;600;700&amp;display=swap">
+  <link rel="stylesheet" href="./reader.css">
+  <link rel="stylesheet" href="semantic.min.css">
+  <script src="./jszip.min.js" defer></script>
+  <script src="./epub.js" defer></script>
+  <script src="/app-theme.js" defer></script>
+  <script src="./reader.js" defer></script>
+  <script src="pwa.js" defer></script>
 </head>
-
 <body>
-  <div class="reader-app theme-paper" id="readerApp">
-    <main class="reader-stage" aria-label="EPUB reader">
-      <div class="viewer-frame">
-        <div id="viewer"></div>
+  <div class="reader-app theme-paper" id="readerApp" data-book-query-param="file" data-book-id-template="{fileStem}" data-book-title-template="{bookTitle}" data-show-close-button="true" data-epub-url-template="/epubs/{file}" data-progress-url-template="/api/reading-progress/{file}" data-app-config-url="/api/app-config" data-close-url="index.html" data-hide-settings="false" data-hide-progress="false" data-persist-settings="true" data-persist-location="true" data-persist-progress="true" data-settings-storage-key="dyslibria:reader-settings:v1" data-location-storage-key-template="dyslibria:reader:{file}" data-disable-dyslibria="false">
+  <main class="reader-stage" aria-label="EPUB reader">
+    <div class="viewer-frame">
+      <div id="viewer"></div>
+    </div>
+
+    <div class="reader-top-actions hidden" id="progressActions" hidden>
+      <a class="action-button reader-close-button" href="index.html" id="closeBookButton">Close book</a>
+    </div>
+
+    <section class="loading-card" id="loadingCard" aria-live="polite">
+      <p class="eyebrow">Reading now</p>
+      <h1 id="loadingTitle">Opening book…</h1>
+      <p class="reader-subtitle" id="loadingMeta">Preparing reader shell</p>
+      <div class="loading-progress-row">
+        <strong id="loadingProgressLabel">0%</strong>
+        <span id="loadingProgressDetail">Preparing reader shell</span>
       </div>
-
-      <div class="reader-top-actions hidden" id="progressActions" hidden>
-        <a class="ui button action-button" href="index.html" id="closeBookButton">Close book</a>
+      <div class="progress-track loading-progress-track" aria-hidden="true">
+        <div class="progress-fill" id="loadingProgressFill"></div>
       </div>
+    </section>
+  </main>
 
-      <section class="loading-card" id="loadingCard" aria-live="polite">
-        <p class="eyebrow">Reading now</p>
-        <h1 id="loadingTitle">Opening book…</h1>
-        <p class="reader-subtitle" id="loadingMeta">Preparing reader shell</p>
-        <div class="loading-progress-row">
-          <strong id="loadingProgressLabel">0%</strong>
-          <span id="loadingProgressDetail">Preparing reader shell</span>
-        </div>
-        <div class="progress-track loading-progress-track" aria-hidden="true">
-          <div class="progress-fill" id="loadingProgressFill"></div>
-        </div>
-      </section>
-    </main>
-
-    <aside class="progress-panel" id="progressPanel" aria-hidden="true">
-      <div class="panel-header">
-        <div>
-          <p class="eyebrow">Reading progress</p>
-          <h2 id="progressTitle">Opening book…</h2>
-          <p class="reader-subtitle" id="progressMeta">Finding saved position</p>
-        </div>
-        <button class="text-button" id="closeProgress" type="button">Close</button>
+  <aside class="progress-panel" id="progressPanel" aria-hidden="true">
+    <div class="panel-header">
+      <div>
+        <p class="eyebrow">Reading progress</p>
+        <h2 id="progressTitle">Opening book…</h2>
+        <p class="reader-subtitle" id="progressMeta">Finding saved position</p>
       </div>
+      <button class="text-button" id="closeProgress" type="button">Close</button>
+    </div>
 
-      <section class="status-card">
-        <div class="progress-row">
-          <strong id="progressLabel">0%</strong>
-          <span id="chapterLabel">Loading chapter data…</span>
-        </div>
-        <div class="progress-track" aria-hidden="true">
-          <div class="progress-fill" id="progressFill"></div>
-        </div>
-        <p class="reader-subtitle progress-detail" id="progressDetail">Reading progress saves automatically.</p>
-      </section>
-    </aside>
-
-    <aside class="settings-panel" id="settingsPanel" aria-hidden="true">
-      <div class="panel-header settings-header">
-        <div>
-          <p class="eyebrow">Display</p>
-          <h1>Reader settings</h1>
-          <p class="reader-subtitle">Adjust typography and layout while keeping the page aligned with your chosen reader theme.</p>
-        </div>
-        <button class="text-button" id="closeSettings" type="button">Close</button>
+    <section class="status-card">
+      <div class="progress-row">
+        <strong id="progressLabel">0%</strong>
+        <span id="chapterLabel">Loading chapter data…</span>
       </div>
+      <div class="progress-track" aria-hidden="true">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <p class="reader-subtitle progress-detail" id="progressDetail">Reading progress saves automatically.</p>
+    </section>
+  </aside>
 
-      <div class="settings-layout">
-        <section class="settings-controls">
-          <div class="settings-grid">
-            <label class="setting-field">
-              <span>Reader theme</span>
-              <select id="themeSelect">
-                <option value="paper">Paper</option>
-                <option value="cream">Warm cream</option>
-                <option value="sepia">Soft sepia</option>
-                <option value="dusk">Dusk paper</option>
-                <option value="sage">Sage paper</option>
-                <option value="slate">Slate paper</option>
-                <option value="cotton">Cotton texture</option>
-                <option value="parchment">Parchment grain</option>
-                <option value="midnight">Midnight</option>
-              </select>
-            </label>
+  <aside class="settings-panel" id="settingsPanel" aria-hidden="true">
+    <div class="panel-header settings-header">
+      <div>
+        <p class="eyebrow">Display</p>
+        <h1>Reader settings</h1>
+        <p class="reader-subtitle">Adjust typography, layout, and theme.</p>
+      </div>
+      <button class="text-button" id="closeSettings" type="button">Close</button>
+    </div>
 
-            <label class="setting-field">
-              <span>Page spread</span>
-              <select id="layoutSelect">
-                <option value="auto">Auto</option>
-                <option value="always">Always show spreads</option>
-                <option value="none">Single page only</option>
-              </select>
-            </label>
+    <div class="settings-layout">
+      <section class="settings-controls">
+        <div class="settings-grid">
+          <label class="setting-field">
+            <span>Reader theme</span>
+            <select id="themeSelect">
+              <option value="paper" selected>Paper</option><option value="cream">Warm cream</option><option value="sepia">Soft sepia</option><option value="dusk">Dusk paper</option><option value="sage">Sage paper</option><option value="slate">Slate paper</option><option value="cotton">Cotton texture</option><option value="parchment">Parchment grain</option><option value="midnight">Midnight</option>
+            </select>
+          </label>
 
-            <label class="setting-field">
-              <span>Font size <strong id="fontSizeValue">110%</strong></span>
-              <input id="fontSizeInput" type="range" min="50" max="235" step="5" value="110">
-            </label>
+          <label class="setting-field">
+            <span>Page spread</span>
+            <select id="layoutSelect">
+              <option value="auto">Auto</option>
+              <option value="always">Always show spreads</option>
+              <option value="none">Single page only</option>
+            </select>
+          </label>
 
-            <label class="setting-field">
-              <span>Line height <strong id="lineHeightValue">1.6</strong></span>
-              <input id="lineHeightInput" type="range" min="1.1" max="2.5" step="0.05" value="1.6">
-            </label>
+          <label class="setting-field">
+            <span>Font size <strong id="fontSizeValue">110%</strong></span>
+            <input id="fontSizeInput" type="range" min="50" max="235" step="5" value="110" />
+          </label>
 
-            <label class="setting-field">
-              <span>Page margin <strong id="pageMarginValue">6.5%</strong></span>
-              <input id="pageMarginInput" type="range" min="3" max="12" step="0.5" value="6.5">
-            </label>
+          <label class="setting-field">
+            <span>Line height <strong id="lineHeightValue">1.6</strong></span>
+            <input id="lineHeightInput" type="range" min="1.1" max="2.5" step="0.05" value="1.6" />
+          </label>
 
-            <div class="setting-field font-gallery-field">
-              <span>Font family</span>
-              <span class="setting-help">Each preview uses a light Dyslibria Default-style emphasis so readers can compare rhythm as well as shape.</span>
-              <div class="font-choice-grid" id="fontPresetGrid" aria-label="Font family choices"></div>
-            </div>
+          <label class="setting-field">
+            <span>Page margin <strong id="pageMarginValue">6.5%</strong></span>
+            <input id="pageMarginInput" type="range" min="3" max="12" step="0.5" value="6.5" />
+          </label>
 
-            <section class="setting-field toggle-card">
-              <p class="toggle-intro">Why would you do this?</p>
-              <label class="toggle-field" for="disableDyslibriaInput">
-                <span class="toggle-copy">
-                  <span class="toggle-label">Turn off Dyslibria</span>
-                  <span class="setting-help">Keep the same book layout and colours, but remove Dyslibria’s front-of-word bolding while you read.</span>
-                </span>
-                <span class="toggle-switch">
-                  <input id="disableDyslibriaInput" class="toggle-input" type="checkbox" role="switch" aria-label="Turn off Dyslibria">
-                  <span class="toggle-slider" aria-hidden="true"></span>
-                </span>
-              </label>
-            </section>
+          <div class="setting-field font-gallery-field">
+            <span>Font family</span>
+            <div class="font-choice-grid" id="fontPresetGrid" aria-label="Font family choices"></div>
           </div>
-        </section>
-      </div>
-    </aside>
 
-    <div class="reader-scrim" id="readerScrim"></div>
-  </div>
+          <section class="setting-field toggle-card">
+            <p class="toggle-intro">Why would you do this?</p>
+            <label class="toggle-field" for="disableDyslibriaInput">
+              <span class="toggle-copy">
+                <span class="toggle-label">Turn off Dyslibria</span>
+                <span class="setting-help">Keep the same layout and theme, but remove Dyslibria&apos;s whole-word emphasis.</span>
+              </span>
+              <span class="toggle-switch">
+                <input id="disableDyslibriaInput" class="toggle-input" type="checkbox" role="switch" aria-label="Turn off Dyslibria" />
+                <span class="toggle-slider" aria-hidden="true"></span>
+              </span>
+            </label>
+          </section>
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <div class="reader-scrim" id="readerScrim"></div>
+</div>
 </body>
-
 </html>

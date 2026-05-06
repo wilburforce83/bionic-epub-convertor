@@ -1,15 +1,264 @@
 (function () {
+  const readerApp = document.getElementById('readerApp');
   const params = new URLSearchParams(window.location.search);
-  const fileName = params.get('file');
-  const requestedLocation = params.get('loc');
 
-  const SETTINGS_STORAGE_KEY = 'dyslibria:reader-settings:v1';
-  const LOCATION_STORAGE_KEY = fileName ? `dyslibria:reader:${fileName}` : '';
+  function getDatasetValue(key) {
+    return readerApp ? readerApp.dataset[key] || '' : '';
+  }
+
+  function firstNonEmpty(values, fallbackValue) {
+    const list = Array.isArray(values) ? values : [values];
+
+    for (let index = 0; index < list.length; index += 1) {
+      const candidate = String(list[index] || '').trim();
+      if (candidate) {
+        return candidate;
+      }
+    }
+
+    return typeof fallbackValue === 'string' ? fallbackValue : '';
+  }
+
+  function createBookIdFromValue(value) {
+    const normalizedValue = String(value || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    return normalizedValue ? `reader-${normalizedValue}` : '';
+  }
+
+  function formatFallbackBookTitle(value) {
+    const rawValue = String(value || '').trim();
+    if (!rawValue) {
+      return '';
+    }
+
+    const lastSegment = rawValue.split('/').pop() || rawValue;
+    const withoutExtension = lastSegment.replace(/\.[a-z0-9]{1,8}$/i, '');
+    const normalizedWhitespace = withoutExtension
+      .replace(/[_]+/g, ' ')
+      .replace(/[-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!normalizedWhitespace) {
+      return '';
+    }
+
+    return normalizedWhitespace.replace(/\b([a-z])/g, function (_, character) {
+      return character.toUpperCase();
+    });
+  }
+
+  function collectQueryTemplateValues(searchParams, bookQueryParam) {
+    const values = {};
+    searchParams.forEach(function (value, key) {
+      if (!Object.prototype.hasOwnProperty.call(values, key)) {
+        values[key] = value;
+      }
+    });
+
+    const resolvedQueryParam = String(bookQueryParam || '').trim();
+    const primaryBookValue = resolvedQueryParam && values[resolvedQueryParam]
+      ? String(values[resolvedQueryParam]).trim()
+      : '';
+
+    if (!primaryBookValue) {
+      return values;
+    }
+
+    const lastSegment = primaryBookValue.split('/').pop() || primaryBookValue;
+    const stem = lastSegment.replace(/\.[a-z0-9]{1,8}$/i, '');
+
+    if (!values.book) {
+      values.book = primaryBookValue;
+    }
+
+    if (!values.file) {
+      values.file = primaryBookValue;
+    }
+
+    if (!values.fileName) {
+      values.fileName = lastSegment;
+    }
+
+    if (!values.filename) {
+      values.filename = lastSegment;
+    }
+
+    if (!values.fileStem) {
+      values.fileStem = stem;
+    }
+
+    if (!values.bookFile) {
+      values.bookFile = lastSegment;
+    }
+
+    if (!values.bookStem) {
+      values.bookStem = stem;
+    }
+
+    if (!values.bookTitle) {
+      values.bookTitle = formatFallbackBookTitle(lastSegment);
+    }
+
+    return values;
+  }
+
+  function interpolateTemplate(template, values, mode) {
+    const rawTemplate = String(template || '').trim();
+
+    if (!rawTemplate) {
+      return '';
+    }
+
+    return rawTemplate.replace(/\{([^{}]+)\}/g, function (_, token) {
+      const tokenKey = String(token || '').trim();
+      const replacement = Object.prototype.hasOwnProperty.call(values, tokenKey)
+        ? String(values[tokenKey] || '')
+        : '';
+
+      if (mode === 'url') {
+        return encodeURIComponent(replacement);
+      }
+
+      return replacement;
+    });
+  }
+
+  const hasTemplateBootstrap = Boolean(
+    getDatasetValue('bookIdTemplate') ||
+      getDatasetValue('bookTitleTemplate') ||
+      getDatasetValue('bookAuthorTemplate') ||
+      getDatasetValue('bookLanguageTemplate') ||
+      getDatasetValue('epubUrlTemplate') ||
+      getDatasetValue('progressUrlTemplate') ||
+      getDatasetValue('appConfigUrlTemplate') ||
+      getDatasetValue('closeUrlTemplate') ||
+      getDatasetValue('locationStorageKeyTemplate')
+  );
+  const bookQueryParam = firstNonEmpty([
+    getDatasetValue('bookQueryParam'),
+    hasTemplateBootstrap ? 'file' : ''
+  ]);
+  const queryTemplateValues = collectQueryTemplateValues(params, bookQueryParam);
+  const bookId = firstNonEmpty([
+    getDatasetValue('bookId'),
+    interpolateTemplate(getDatasetValue('bookIdTemplate'), queryTemplateValues, 'text'),
+    createBookIdFromValue(queryTemplateValues.fileStem || queryTemplateValues.book || queryTemplateValues.bookTitle)
+  ]);
+  const initialBookTitle = firstNonEmpty([
+    getDatasetValue('bookTitle'),
+    interpolateTemplate(getDatasetValue('bookTitleTemplate'), queryTemplateValues, 'text'),
+    queryTemplateValues.bookTitle
+  ]);
+  const initialBookAuthor = firstNonEmpty([
+    getDatasetValue('bookAuthor'),
+    interpolateTemplate(getDatasetValue('bookAuthorTemplate'), queryTemplateValues, 'text')
+  ]);
+  const initialBookLanguage = firstNonEmpty([
+    getDatasetValue('bookLanguage'),
+    interpolateTemplate(getDatasetValue('bookLanguageTemplate'), queryTemplateValues, 'text')
+  ]);
+  const appConfigUrl = firstNonEmpty([
+    getDatasetValue('appConfigUrl'),
+    interpolateTemplate(getDatasetValue('appConfigUrlTemplate'), queryTemplateValues, 'url')
+  ]);
+  const epubUrl = firstNonEmpty([
+    getDatasetValue('epubUrl'),
+    interpolateTemplate(getDatasetValue('epubUrlTemplate'), queryTemplateValues, 'url')
+  ]);
+  const progressUrl = firstNonEmpty([
+    getDatasetValue('progressUrl'),
+    interpolateTemplate(getDatasetValue('progressUrlTemplate'), queryTemplateValues, 'url')
+  ]);
+  const closeUrl = firstNonEmpty([
+    getDatasetValue('closeUrl'),
+    interpolateTemplate(getDatasetValue('closeUrlTemplate'), queryTemplateValues, 'url')
+  ]);
+  const requestedLocation = params.get('loc') || getDatasetValue('startLocation') || '';
+  const shouldPersistSettings = parseBooleanDataAttribute(
+    getDatasetValue('persistSettings'),
+    true
+  );
+  const shouldPersistLocation = parseBooleanDataAttribute(
+    getDatasetValue('persistLocation'),
+    true
+  );
+  const shouldPersistProgress = Boolean(progressUrl) && parseBooleanDataAttribute(
+    getDatasetValue('persistProgress'),
+    true
+  );
+  const allowSettingsOverlay = !parseBooleanDataAttribute(
+    getDatasetValue('hideSettings'),
+    false
+  );
+  const allowProgressOverlay = !parseBooleanDataAttribute(
+    getDatasetValue('hideProgress'),
+    false
+  );
+  const shouldShowCloseButton = parseBooleanDataAttribute(
+    getDatasetValue('showCloseButton'),
+    Boolean(closeUrl)
+  );
+  const requestedDisableDyslibria = resolveRequestedDisableDyslibria();
+
+  const SETTINGS_STORAGE_KEY = firstNonEmpty([
+    getDatasetValue('settingsStorageKey'),
+    'dyslibria:reader-settings:v1'
+  ]);
+  const LOCATION_STORAGE_KEY = firstNonEmpty([
+    getDatasetValue('locationStorageKey'),
+    interpolateTemplate(getDatasetValue('locationStorageKeyTemplate'), queryTemplateValues, 'text'),
+    bookId ? `dyslibria:reader:${bookId}` : ''
+  ]);
   const AUTO_SPREAD_MIN_WIDTH = 1180;
+  const TAP_MAX_TRAVEL_PX = 18;
+  const TAP_MAX_DURATION_MS = 420;
   const previewFunctionWords = new Set([
     'a', 'an', 'and', 'as', 'at', 'but', 'by', 'can', 'for', 'from', 'help', 'in', 'keep',
     'less', 'make', 'more', 'of', 'on', 'or', 'the', 'to', 'with', 'without'
   ]);
+
+  function parseBooleanDataAttribute(value, fallbackValue) {
+    const normalizedValue = String(value || '').trim().toLowerCase();
+
+    if (!normalizedValue) {
+      return fallbackValue;
+    }
+
+    if (['1', 'true', 'yes', 'on'].indexOf(normalizedValue) >= 0) {
+      return true;
+    }
+
+    if (['0', 'false', 'no', 'off'].indexOf(normalizedValue) >= 0) {
+      return false;
+    }
+
+    return fallbackValue;
+  }
+
+  function resolveRequestedDisableDyslibria() {
+    const queryValue = String(params.get('dyslibria') || '').trim().toLowerCase();
+
+    if (queryValue === 'off') {
+      return true;
+    }
+
+    if (queryValue === 'on') {
+      return false;
+    }
+
+    if (!readerApp) {
+      return null;
+    }
+
+    const datasetValue = getDatasetValue('disableDyslibria');
+    return typeof datasetValue === 'string' && datasetValue.length > 0
+      ? parseBooleanDataAttribute(datasetValue, false)
+      : null;
+  }
 
   const defaultSettings = {
     theme: 'paper',
@@ -55,84 +304,72 @@
       id: 'accessible',
       name: 'Accessible Sans',
       family: '"Avenir Next", "Segoe UI", "Trebuchet MS", sans-serif',
-      note: 'Familiar humanist system stack with steady shapes.',
       preview: 'Calmer scanning with friendly familiar letterforms.'
     },
     {
       id: 'atkinson',
       name: 'Atkinson Hyperlegible',
       family: '"Atkinson Hyperlegible", "Avenir Next", "Segoe UI", sans-serif',
-      note: 'Built for stronger character distinction and readability.',
       preview: 'Clearer letters help keep fast lines from blurring.'
     },
     {
       id: 'lexend',
       name: 'Lexend',
       family: '"Lexend", "Avenir Next", "Segoe UI", sans-serif',
-      note: 'Open spacing and smoother pacing for visual tracking.',
       preview: 'Roomier word shapes can slow visual crowding down.'
     },
     {
       id: 'sourceSans',
       name: 'Source Sans 3',
       family: '"Source Sans 3", "Segoe UI", sans-serif',
-      note: 'Balanced, low-noise sans for longer reading sessions.',
       preview: 'A calmer page texture keeps focus on the sentence.'
     },
     {
       id: 'publicSans',
       name: 'Public Sans',
       family: '"Public Sans", "Segoe UI", sans-serif',
-      note: 'Crisp proportions with a confident, sturdy rhythm.',
       preview: 'Clean rhythm can make paragraphs feel less hectic.'
     },
     {
       id: 'notoSans',
       name: 'Noto Sans',
       family: '"Noto Sans", "Segoe UI", sans-serif',
-      note: 'Consistent spacing with broad language coverage.',
       preview: 'Steady spacing supports quieter, more even reading.'
     },
     {
       id: 'ibmPlex',
       name: 'IBM Plex Sans',
       family: '"IBM Plex Sans", "Segoe UI", sans-serif',
-      note: 'Compact clarity for readers who like sharper structure.',
       preview: 'Sharper contours can anchor attention on each line.'
     },
     {
       id: 'nunito',
       name: 'Nunito Sans',
       family: '"Nunito Sans", "Segoe UI", sans-serif',
-      note: 'Rounded shapes for a softer, less rigid page feel.',
       preview: 'Softer curves can make dense pages feel more gentle.'
     },
     {
       id: 'merriweatherSans',
       name: 'Merriweather Sans',
       family: '"Merriweather Sans", "Trebuchet MS", sans-serif',
-      note: 'Open counters with a slightly more literary texture.',
       preview: 'Readable warmth without losing structure or contrast.'
     },
     {
       id: 'literata',
       name: 'Literata',
       family: '"Literata", "Iowan Old Style", "Palatino Linotype", Georgia, serif',
-      note: 'Thoughtful serif rhythm for readers who like a bookish page.',
       preview: 'Gentle serif texture can make long reading feel grounded.'
     },
     {
       id: 'sourceSerif',
       name: 'Source Serif 4',
       family: '"Source Serif 4", "Palatino Linotype", Georgia, serif',
-      note: 'Clear contemporary serif with strong structure and calm flow.',
       preview: 'Sharper serifs can help word shapes feel more anchored.'
     },
     {
       id: 'figtree',
       name: 'Figtree',
       family: '"Figtree", "Avenir Next", "Segoe UI", sans-serif',
-      note: 'Friendly modern shapes with clean, even word flow.',
       preview: 'Smooth curves and tidy spacing can reduce fatigue.'
     }
   ];
@@ -179,6 +416,7 @@
     progressLabel: document.getElementById('progressLabel'),
     chapterLabel: document.getElementById('chapterLabel'),
     progressFill: document.getElementById('progressFill'),
+    closeBookButton: document.getElementById('closeBookButton'),
     themeSelect: document.getElementById('themeSelect'),
     fontPresetGrid: document.getElementById('fontPresetGrid'),
     fontSizeInput: document.getElementById('fontSizeInput'),
@@ -195,7 +433,8 @@
     overlay: null,
     overlayHistoryActive: false,
     lastSurfaceActionAt: 0,
-    lastTouchEventAt: 0
+    lastTouchEventAt: 0,
+    activeTouchGesture: null
   };
 
   let book = null;
@@ -217,7 +456,7 @@
   };
 
   function parseStoredJson(key, fallbackValue) {
-    if (!key) {
+    if (!shouldPersistSettings || !key) {
       return fallbackValue;
     }
 
@@ -377,7 +616,6 @@
       button.innerHTML = `
         <span class="font-choice-name">${escapeHtml(option.name)}</span>
         <span class="font-choice-preview">${createDyslibriaPreviewMarkup(option.preview)}</span>
-        <span class="font-choice-note">${escapeHtml(option.note)}</span>
       `;
       button.addEventListener('click', function () {
         settings.fontFamily = option.id;
@@ -413,13 +651,20 @@
   settings.pageMargin = normalizeNumericSetting(settings.pageMargin, numericSettingRanges.pageMargin);
   settings.flow = 'paginated';
   settings.disableDyslibria = Boolean(settings.disableDyslibria);
+  if (requestedDisableDyslibria !== null) {
+    settings.disableDyslibria = requestedDisableDyslibria;
+  }
 
   function persistSettings() {
+    if (!shouldPersistSettings || !SETTINGS_STORAGE_KEY) {
+      return;
+    }
+
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
   }
 
   function persistLocalLocation(cfi) {
-    if (!LOCATION_STORAGE_KEY || !cfi) {
+    if (!shouldPersistLocation || !LOCATION_STORAGE_KEY || !cfi) {
       return;
     }
 
@@ -427,7 +672,7 @@
   }
 
   function getSavedLocalLocation() {
-    if (!LOCATION_STORAGE_KEY) {
+    if (!shouldPersistLocation || !LOCATION_STORAGE_KEY) {
       return '';
     }
 
@@ -439,11 +684,15 @@
     }
   }
 
-  async function fetchSavedProgress(filename) {
+  async function fetchSavedProgress() {
     const fallbackLocation = getSavedLocalLocation();
 
+    if (!shouldPersistProgress) {
+      return fallbackLocation ? { location: fallbackLocation } : null;
+    }
+
     try {
-      const response = await fetch(`/api/reading-progress/${encodeURIComponent(filename)}`, {
+      const response = await fetch(progressUrl, {
         credentials: 'same-origin'
       });
 
@@ -464,12 +713,12 @@
   }
 
   async function saveReadingProgress(snapshot) {
-    if (!fileName || !snapshot || !snapshot.location) {
+    if (!shouldPersistProgress || !snapshot || !snapshot.location) {
       return;
     }
 
     try {
-      const response = await fetch(`/api/reading-progress/${encodeURIComponent(fileName)}`, {
+      const response = await fetch(progressUrl, {
         method: 'POST',
         credentials: 'same-origin',
         headers: {
@@ -531,12 +780,12 @@
   }
 
   async function loadAppConfig() {
-    if (!window.DyslibriaTheme) {
+    if (!window.DyslibriaTheme || !appConfigUrl) {
       return;
     }
 
     try {
-      const response = await fetch('/api/app-config', {
+      const response = await fetch(appConfigUrl, {
         credentials: 'same-origin'
       });
 
@@ -578,20 +827,37 @@
   }
 
   function updateOverlayState() {
-    const settingsOpen = uiState.overlay === 'settings';
-    const progressOpen = uiState.overlay === 'progress';
+    const settingsOpen = allowSettingsOverlay && uiState.overlay === 'settings';
+    const progressOpen = allowProgressOverlay && uiState.overlay === 'progress';
     const overlayVisible = Boolean(uiState.overlay);
 
-    elements.settingsPanel.classList.toggle('is-open', settingsOpen);
-    elements.settingsPanel.setAttribute('aria-hidden', settingsOpen ? 'false' : 'true');
-    elements.progressPanel.classList.toggle('is-open', progressOpen);
-    elements.progressPanel.setAttribute('aria-hidden', progressOpen ? 'false' : 'true');
-    elements.scrim.classList.toggle('is-visible', overlayVisible);
-    elements.progressActions.hidden = !progressOpen;
-    elements.progressActions.classList.toggle('is-visible', progressOpen);
+    if (elements.settingsPanel) {
+      elements.settingsPanel.hidden = !allowSettingsOverlay;
+      elements.settingsPanel.classList.toggle('is-open', settingsOpen);
+      elements.settingsPanel.setAttribute('aria-hidden', settingsOpen ? 'false' : 'true');
+    }
+
+    if (elements.progressPanel) {
+      elements.progressPanel.hidden = !allowProgressOverlay;
+      elements.progressPanel.classList.toggle('is-open', progressOpen);
+      elements.progressPanel.setAttribute('aria-hidden', progressOpen ? 'false' : 'true');
+    }
+
+    if (elements.scrim) {
+      elements.scrim.classList.toggle('is-visible', overlayVisible);
+    }
+
+    if (elements.progressActions) {
+      elements.progressActions.hidden = !progressOpen;
+      elements.progressActions.classList.toggle('is-visible', progressOpen);
+    }
   }
 
   function openOverlay(name, options = {}) {
+    if ((name === 'settings' && !allowSettingsOverlay) || (name === 'progress' && !allowProgressOverlay)) {
+      return;
+    }
+
     if (uiState.overlay === name) {
       return;
     }
@@ -639,6 +905,48 @@
 
   function markLoaded() {
     elements.app.classList.add('is-loaded');
+    postReaderState('dyslibria-reader:ready');
+  }
+
+  function createReaderEventDetail(type) {
+    return {
+      type: type || 'dyslibria-reader:state',
+      bookId: bookId,
+      title: latestProgress.title || initialBookTitle || '',
+      author: latestProgress.author || initialBookAuthor || '',
+      language: initialBookLanguage,
+      disableDyslibria: settings.disableDyslibria,
+      progress: {
+        ...latestProgress
+      }
+    };
+  }
+
+  function dispatchReaderEvent(type, detail, cancelable) {
+    const payload = detail || createReaderEventDetail(type);
+    const windowEvent = new CustomEvent(type, {
+      detail: payload,
+      cancelable: Boolean(cancelable)
+    });
+    window.dispatchEvent(windowEvent);
+    document.dispatchEvent(new CustomEvent(type, {
+      detail: payload
+    }));
+    return windowEvent;
+  }
+
+  function getProgressPersistenceDetail(pageLabel) {
+    const safePageLabel = pageLabel ? `${pageLabel}. ` : '';
+
+    if (shouldPersistProgress) {
+      return `${safePageLabel}Reading progress saves automatically.`;
+    }
+
+    if (shouldPersistLocation) {
+      return `${safePageLabel}Reading position is saved on this device.`;
+    }
+
+    return `${safePageLabel}Reading progress updates as you move through the book.`;
   }
 
   function normalizeHref(href) {
@@ -693,7 +1001,7 @@
     return latestProgress.location || requestedLocation || getSavedLocalLocation() || '';
   }
 
-  function scheduleLayoutRealignment() {
+  function scheduleLayoutRealignment(targetLocation) {
     if (!rendition || !rendition.manager || !rendition.manager.isRendered()) {
       return;
     }
@@ -709,12 +1017,12 @@
         return;
       }
 
-      const targetLocation = getStableLocationTarget();
-      if (!targetLocation) {
+      const nextTargetLocation = targetLocation || getStableLocationTarget();
+      if (!nextTargetLocation) {
         return;
       }
 
-      Promise.resolve(rendition.display(targetLocation)).catch(function (error) {
+      Promise.resolve(rendition.display(nextTargetLocation)).catch(function (error) {
         console.warn('Unable to realign the paginated spread after a layout change:', error);
       });
     }, 48);
@@ -794,13 +1102,15 @@
     rendition.prev();
   }
 
-  function shouldIgnoreSurfaceEvent(event) {
+  function shouldIgnoreSurfaceAction(options) {
+    const normalizedOptions = options || {};
     const now = Date.now();
-    if (event.type === 'click' && now - uiState.lastTouchEventAt < 700) {
+
+    if (!normalizedOptions.fromTouch && now - uiState.lastTouchEventAt < 700) {
       return true;
     }
 
-    if (event.type === 'touchend') {
+    if (normalizedOptions.fromTouch) {
       uiState.lastTouchEventAt = now;
     }
 
@@ -810,6 +1120,151 @@
 
     uiState.lastSurfaceActionAt = now;
     return false;
+  }
+
+  function getTouchFromEvent(event, identifier) {
+    if (!event) {
+      return null;
+    }
+
+    const touchLists = [event.changedTouches, event.touches];
+
+    for (let listIndex = 0; listIndex < touchLists.length; listIndex += 1) {
+      const touchList = touchLists[listIndex];
+      if (!touchList || !touchList.length) {
+        continue;
+      }
+
+      if (typeof identifier === 'number') {
+        for (let touchIndex = 0; touchIndex < touchList.length; touchIndex += 1) {
+          const candidate = touchList[touchIndex];
+          if (candidate && candidate.identifier === identifier) {
+            return candidate;
+          }
+        }
+      }
+
+      if (touchList[0]) {
+        return touchList[0];
+      }
+    }
+
+    return null;
+  }
+
+  function clearActiveTouchGesture() {
+    uiState.activeTouchGesture = null;
+  }
+
+  function isTapGesture(gesture, point) {
+    if (!gesture || !point) {
+      return false;
+    }
+
+    const elapsed = Date.now() - gesture.startedAt;
+    const deltaX = point.x - gesture.startPoint.x;
+    const deltaY = point.y - gesture.startPoint.y;
+    const travel = Math.hypot(deltaX, deltaY);
+
+    return !gesture.moved && elapsed <= TAP_MAX_DURATION_MS && travel <= TAP_MAX_TRAVEL_PX;
+  }
+
+  function startTouchGesture(event, contents, scope) {
+    if (!event || uiState.overlay || isInteractiveTarget(event.target)) {
+      clearActiveTouchGesture();
+      return;
+    }
+
+    if (!event.touches || event.touches.length !== 1) {
+      clearActiveTouchGesture();
+      return;
+    }
+
+    const touch = getTouchFromEvent(event);
+    if (!touch) {
+      clearActiveTouchGesture();
+      return;
+    }
+
+    const point = normalizePointerPoint({
+      x: touch.clientX,
+      y: touch.clientY
+    }, contents);
+
+    if (!point) {
+      clearActiveTouchGesture();
+      return;
+    }
+
+    uiState.activeTouchGesture = {
+      identifier: touch.identifier,
+      startedAt: Date.now(),
+      startPoint: point,
+      lastPoint: point,
+      moved: false,
+      scope: scope || 'content',
+      contents: contents || null
+    };
+  }
+
+  function updateTouchGesture(event, contents) {
+    const gesture = uiState.activeTouchGesture;
+    if (!gesture) {
+      return;
+    }
+
+    const touch = getTouchFromEvent(event, gesture.identifier);
+    if (!touch) {
+      return;
+    }
+
+    const point = normalizePointerPoint({
+      x: touch.clientX,
+      y: touch.clientY
+    }, contents || gesture.contents);
+
+    if (!point) {
+      return;
+    }
+
+    gesture.lastPoint = point;
+
+    if (!gesture.moved) {
+      const deltaX = point.x - gesture.startPoint.x;
+      const deltaY = point.y - gesture.startPoint.y;
+      if (Math.hypot(deltaX, deltaY) > TAP_MAX_TRAVEL_PX) {
+        gesture.moved = true;
+      }
+    }
+  }
+
+  function finishTouchGesture(event, contents, scope) {
+    const gesture = uiState.activeTouchGesture;
+    clearActiveTouchGesture();
+
+    if (!gesture || gesture.scope !== (scope || 'content') || uiState.overlay || isInteractiveTarget(event.target)) {
+      return;
+    }
+
+    const touch = getTouchFromEvent(event, gesture.identifier);
+    if (!touch) {
+      return;
+    }
+
+    const point = normalizePointerPoint({
+      x: touch.clientX,
+      y: touch.clientY
+    }, contents || gesture.contents);
+
+    if (!isTapGesture(gesture, point)) {
+      return;
+    }
+
+    if (shouldIgnoreSurfaceAction({ fromTouch: true })) {
+      return;
+    }
+
+    handleViewportZoneAction(point, event);
   }
 
   function handleViewportZoneAction(point, event) {
@@ -828,6 +1283,7 @@
     }
 
     if (
+      allowProgressOverlay &&
       xRatio >= zoneConfig.progressMinX &&
       xRatio <= zoneConfig.progressMaxX &&
       yRatio >= zoneConfig.progressMinY
@@ -837,6 +1293,7 @@
     }
 
     if (
+      allowSettingsOverlay &&
       xRatio >= zoneConfig.settingsMinX &&
       xRatio <= zoneConfig.settingsMaxX &&
       yRatio >= zoneConfig.settingsMinY &&
@@ -865,7 +1322,7 @@
       return;
     }
 
-    if (shouldIgnoreSurfaceEvent(event)) {
+    if (shouldIgnoreSurfaceAction()) {
       return;
     }
 
@@ -889,7 +1346,7 @@
       return;
     }
 
-    if (shouldIgnoreSurfaceEvent(event)) {
+    if (shouldIgnoreSurfaceAction()) {
       return;
     }
 
@@ -899,6 +1356,120 @@
     }
 
     handleViewportZoneAction(point, event);
+  }
+
+  function handleContentTouchStart(event, contents) {
+    startTouchGesture(event, contents, 'content');
+  }
+
+  function handleContentTouchMove(event, contents) {
+    updateTouchGesture(event, contents);
+  }
+
+  function handleContentTouchEnd(event, contents) {
+    finishTouchGesture(event, contents, 'content');
+  }
+
+  function handleShellTouchStart(event) {
+    if (
+      !elements.viewerFrame ||
+      !elements.viewerFrame.contains(event.target) ||
+      (event.target !== elements.viewerFrame && event.target !== elements.viewer)
+    ) {
+      clearActiveTouchGesture();
+      return;
+    }
+
+    startTouchGesture(event, null, 'shell');
+  }
+
+  function handleShellTouchMove(event) {
+    updateTouchGesture(event, null);
+  }
+
+  function handleShellTouchEnd(event) {
+    if (
+      !elements.viewerFrame ||
+      !elements.viewerFrame.contains(event.target) ||
+      (event.target !== elements.viewerFrame && event.target !== elements.viewer)
+    ) {
+      clearActiveTouchGesture();
+      return;
+    }
+
+    finishTouchGesture(event, null, 'shell');
+  }
+
+  function attachContentTouchInteractions(contents) {
+    if (!contents || !contents.document) {
+      return;
+    }
+
+    const doc = contents.document;
+    const root = doc.documentElement;
+
+    if (root && root.dataset.dyslibriaTouchInteractionsBound === 'true') {
+      return;
+    }
+
+    if (root) {
+      root.dataset.dyslibriaTouchInteractionsBound = 'true';
+    }
+
+    doc.addEventListener('touchstart', function (event) {
+      handleContentTouchStart(event, contents);
+    }, { passive: true });
+
+    doc.addEventListener('touchmove', function (event) {
+      handleContentTouchMove(event, contents);
+    }, { passive: true });
+
+    doc.addEventListener('touchend', function (event) {
+      handleContentTouchEnd(event, contents);
+    }, { passive: false });
+
+    doc.addEventListener('touchcancel', clearActiveTouchGesture, { passive: true });
+  }
+
+  function postReaderState(type) {
+    const payload = createReaderEventDetail(type);
+    dispatchReaderEvent(payload.type, payload);
+
+    if (window.parent === window || !window.parent) {
+      return;
+    }
+
+    window.parent.postMessage(payload, window.location.origin);
+  }
+
+  function syncDisableDyslibriaSetting(nextValue) {
+    const safeValue = Boolean(nextValue);
+
+    if (settings.disableDyslibria === safeValue) {
+      postReaderState();
+      return;
+    }
+
+    settings.disableDyslibria = safeValue;
+    updateSettingLabels();
+    applyReaderSettings();
+    persistSettings();
+    postReaderState();
+  }
+
+  function handleParentMessage(event) {
+    if (event.origin !== window.location.origin || !event.data || typeof event.data !== 'object') {
+      return;
+    }
+
+    if (event.data.type === 'dyslibria-reader:set-disable-dyslibria') {
+      syncDisableDyslibriaSetting(event.data.disableDyslibria);
+      return;
+    }
+
+    if (event.data.type === 'dyslibria-reader:request-state') {
+      postReaderState();
+    }
   }
 
   function lockContentSelection(contents) {
@@ -1072,6 +1643,12 @@
     const readerStyles = window.getComputedStyle(readerStyleSource);
     const fontFamily = fontFamilies[settings.fontFamily] || fontFamilies.accessible;
     const pageText = readerStyles.getPropertyValue('--reader-page-text').trim() || '#1b1a18';
+    const pageBackground = readerStyles.backgroundColor || '#f6f2e8';
+    const pageBackgroundImage = readerStyles.backgroundImage || 'none';
+    const pageBackgroundSize = readerStyles.backgroundSize || 'auto';
+    const pageBackgroundRepeat = readerStyles.backgroundRepeat || 'no-repeat';
+    const pageBackgroundPosition = readerStyles.backgroundPosition || 'center';
+    const pageBackgroundBlendMode = readerStyles.backgroundBlendMode || 'normal';
 
     const dyslibriaOffRules = settings.disableDyslibria
       ? `
@@ -1106,16 +1683,42 @@
       body {
         -webkit-text-size-adjust: 100% !important;
         text-size-adjust: 100% !important;
-        background: transparent !important;
-        background-color: transparent !important;
-        background-image: none !important;
+        background-color: ${pageBackground} !important;
+        background-image: ${pageBackgroundImage} !important;
+        background-size: ${pageBackgroundSize} !important;
+        background-repeat: ${pageBackgroundRepeat} !important;
+        background-position: ${pageBackgroundPosition} !important;
+        background-blend-mode: ${pageBackgroundBlendMode} !important;
         color: ${pageText} !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        font-family: ${fontFamily} !important;
       }
 
       body {
-        font-family: ${fontFamily} !important;
         line-height: ${String(settings.lineHeight)} !important;
         text-rendering: optimizeLegibility;
+      }
+
+      body * {
+        font-family: inherit !important;
+      }
+
+      body > main,
+      body > article,
+      body > section,
+      body > div,
+      body > .chapter,
+      body > .section,
+      body > .book,
+      body > .calibre {
+        background: transparent !important;
+        background-color: transparent !important;
+        background-image: none !important;
+        border: 0 !important;
+        box-shadow: none !important;
       }
 
       img,
@@ -1148,6 +1751,9 @@
       .dl-frontload-remainder,
       .dyslibria-frontload-prefix,
       .dl-prefix {
+        background: transparent !important;
+        background-color: transparent !important;
+        background-image: none !important;
         color: inherit !important;
         line-height: ${String(settings.lineHeight)} !important;
         white-space: normal !important;
@@ -1214,24 +1820,55 @@
     const readerStyles = window.getComputedStyle(readerStyleSource);
     const fontFamily = fontFamilies[settings.fontFamily] || fontFamilies.accessible;
     const pageText = readerStyles.getPropertyValue('--reader-page-text').trim() || '#1b1a18';
+    const pageBackground = readerStyles.backgroundColor || '#f6f2e8';
+    const pageBackgroundImage = readerStyles.backgroundImage || 'none';
+    const pageBackgroundSize = readerStyles.backgroundSize || 'auto';
+    const pageBackgroundRepeat = readerStyles.backgroundRepeat || 'no-repeat';
+    const pageBackgroundPosition = readerStyles.backgroundPosition || 'center';
+    const pageBackgroundBlendMode = readerStyles.backgroundBlendMode || 'normal';
 
     return {
       html: {
         '-webkit-text-size-adjust': '100% !important',
         'text-size-adjust': '100% !important',
-        'background': 'transparent !important',
-        'background-color': 'transparent !important',
-        'background-image': 'none !important',
-        'color': `${pageText} !important`
+        'background-color': `${pageBackground} !important`,
+        'background-image': `${pageBackgroundImage} !important`,
+        'background-size': `${pageBackgroundSize} !important`,
+        'background-repeat': `${pageBackgroundRepeat} !important`,
+        'background-position': `${pageBackgroundPosition} !important`,
+        'background-blend-mode': `${pageBackgroundBlendMode} !important`,
+        'color': `${pageText} !important`,
+        margin: '0 !important',
+        padding: '0 !important',
+        border: '0 !important',
+        'box-shadow': 'none !important',
+        'font-family': `${fontFamily} !important`
       },
       body: {
         'font-family': `${fontFamily} !important`,
         'line-height': `${String(settings.lineHeight)} !important`,
         'text-rendering': 'optimizeLegibility',
+        'background-color': `${pageBackground} !important`,
+        'background-image': `${pageBackgroundImage} !important`,
+        'background-size': `${pageBackgroundSize} !important`,
+        'background-repeat': `${pageBackgroundRepeat} !important`,
+        'background-position': `${pageBackgroundPosition} !important`,
+        'background-blend-mode': `${pageBackgroundBlendMode} !important`,
+        'color': `${pageText} !important`,
+        margin: '0 !important',
+        padding: '0 !important',
+        border: '0 !important',
+        'box-shadow': 'none !important'
+      },
+      'body *': {
+        'font-family': 'inherit !important'
+      },
+      'body > main, body > article, body > section, body > div, body > .chapter, body > .section, body > .book, body > .calibre': {
         'background': 'transparent !important',
         'background-color': 'transparent !important',
         'background-image': 'none !important',
-        'color': `${pageText} !important`
+        border: '0 !important',
+        'box-shadow': 'none !important'
       },
       'img, svg, video, canvas': {
         'max-width': '100%',
@@ -1239,6 +1876,11 @@
       },
       'figure, picture': {
         'max-width': '100%'
+      },
+      '.dyslibria-engine, .dl-engine, .dyslibria-paragraph, .dl-paragraph, .dyslibria-word, .dl-word, .dyslibria-zone, .dl-zone, .dyslibria-frontload-remainder, .dl-frontload-remainder, .dyslibria-frontload-prefix, .dl-prefix': {
+        'background': 'transparent !important',
+        'background-color': 'transparent !important',
+        'background-image': 'none !important'
       }
     };
   }
@@ -1250,6 +1892,7 @@
 
     const doc = contents.document;
     updateCoverPresentationMode(doc);
+    applyInlineContentRootPresentation(doc);
     let styleTag = doc.getElementById('dyslibriaContentOverrides');
 
     if (!styleTag) {
@@ -1266,6 +1909,83 @@
     styleTag.textContent = buildContentPresentationStyles();
   }
 
+  function applyInlineContentRootPresentation(doc) {
+    if (!doc) {
+      return;
+    }
+
+    const readerStyleSource = elements.app || document.documentElement;
+    const readerStyles = window.getComputedStyle(readerStyleSource);
+    const fontFamily = fontFamilies[settings.fontFamily] || fontFamilies.accessible;
+    const pageText = readerStyles.getPropertyValue('--reader-page-text').trim() || '#1b1a18';
+    const pageBackground = readerStyles.backgroundColor || '#f6f2e8';
+    const pageBackgroundImage = readerStyles.backgroundImage || 'none';
+    const pageBackgroundSize = readerStyles.backgroundSize || 'auto';
+    const pageBackgroundRepeat = readerStyles.backgroundRepeat || 'no-repeat';
+    const pageBackgroundPosition = readerStyles.backgroundPosition || 'center';
+    const pageBackgroundBlendMode = readerStyles.backgroundBlendMode || 'normal';
+    const isCoverPage = Boolean(
+      (doc.documentElement && doc.documentElement.getAttribute('data-dyslibria-cover-page') === 'true') ||
+      (doc.body && doc.body.getAttribute('data-dyslibria-cover-page') === 'true')
+    );
+    const nonContentTagNames = new Set(['HTML', 'BODY', 'HEAD', 'STYLE', 'SCRIPT', 'LINK', 'META', 'TITLE', 'BASE', 'NOSCRIPT']);
+
+    [doc.documentElement, doc.body].forEach(function (element) {
+      if (!element || !element.style) {
+        return;
+      }
+
+      element.style.setProperty('-webkit-text-size-adjust', '100%', 'important');
+      element.style.setProperty('text-size-adjust', '100%', 'important');
+      element.style.setProperty('color', pageText, 'important');
+      element.style.setProperty('border', '0', 'important');
+      element.style.setProperty('box-shadow', 'none', 'important');
+      element.style.setProperty('font-family', fontFamily, 'important');
+
+      if (element === doc.body) {
+        element.style.setProperty('line-height', String(settings.lineHeight), 'important');
+      }
+
+      if (isCoverPage) {
+        element.style.setProperty('background', 'transparent', 'important');
+        element.style.setProperty('background-color', 'transparent', 'important');
+        element.style.setProperty('background-image', 'none', 'important');
+        element.style.setProperty('background-size', 'auto', 'important');
+        element.style.setProperty('background-repeat', 'no-repeat', 'important');
+        element.style.setProperty('background-position', 'center', 'important');
+        element.style.setProperty('background-blend-mode', 'normal', 'important');
+        return;
+      }
+
+      // EPUB sources sometimes ship inline transparent backgrounds on html/body.
+      // We rewrite the root styles inline so the reading document itself carries
+      // the current reader theme instead of falling back to the browser's white canvas.
+      element.style.setProperty('background', 'none', 'important');
+      element.style.setProperty('background-color', pageBackground, 'important');
+      element.style.setProperty('background-image', pageBackgroundImage, 'important');
+      element.style.setProperty('background-size', pageBackgroundSize, 'important');
+      element.style.setProperty('background-repeat', pageBackgroundRepeat, 'important');
+      element.style.setProperty('background-position', pageBackgroundPosition, 'important');
+      element.style.setProperty('background-blend-mode', pageBackgroundBlendMode, 'important');
+    });
+
+    Array.from(doc.querySelectorAll('*')).forEach(function (element) {
+      if (!element || !element.style) {
+        return;
+      }
+
+      if (nonContentTagNames.has(element.tagName)) {
+        return;
+      }
+
+      if (typeof element.closest === 'function' && element.closest('svg, math')) {
+        return;
+      }
+
+      element.style.setProperty('font-family', fontFamily, 'important');
+    });
+  }
+
   function updateOpenContentPresentationOverrides() {
     if (!rendition || typeof rendition.getContents !== 'function') {
       return;
@@ -1276,8 +1996,8 @@
     });
   }
 
-  async function fetchEpubBuffer(filename) {
-    const response = await fetch(`/epub/${encodeURIComponent(filename)}`, {
+  async function fetchEpubBuffer() {
+    const response = await fetch(epubUrl, {
       credentials: 'same-origin',
       headers: {
         Accept: 'application/epub+zip'
@@ -1311,7 +2031,7 @@
   }
 
   function updateMetadata(title, author) {
-    const safeTitle = title || fileName || 'Untitled book';
+    const safeTitle = title || initialBookTitle || 'Untitled book';
     const safeAuthor = author || 'Unknown author';
 
     elements.progressTitle.textContent = safeTitle;
@@ -1409,14 +2129,14 @@
     elements.progressLabel.textContent = `${percent}%`;
     elements.progressFill.style.width = `${percent}%`;
     elements.chapterLabel.textContent = chapterLabel;
-    elements.progressDetail.textContent = pageLabel
-      ? `${pageLabel}. Reading progress saves on the server automatically.`
-      : 'Reading progress saves on the server automatically.';
+    elements.progressDetail.textContent = getProgressPersistenceDetail(pageLabel);
 
     if (latestProgress.location) {
       persistLocalLocation(latestProgress.location);
       scheduleReadingProgressSave(latestProgress);
     }
+
+    dispatchReaderEvent('dyslibria-reader:progress', createReaderEventDetail('dyslibria-reader:progress'));
   }
 
   function applySavedProgress(snapshot) {
@@ -1443,16 +2163,32 @@
     }
 
     if (snapshot.pageLabel) {
-      elements.progressDetail.textContent = `${snapshot.pageLabel}. Reading progress saves on the server automatically.`;
+      elements.progressDetail.textContent = getProgressPersistenceDetail(snapshot.pageLabel);
     } else {
       const fallbackPageLabel = formatPageLabel(snapshot.pageNumber, snapshot.totalPages);
       if (fallbackPageLabel) {
-        elements.progressDetail.textContent = `${fallbackPageLabel}. Reading progress saves on the server automatically.`;
+        elements.progressDetail.textContent = getProgressPersistenceDetail(fallbackPageLabel);
       }
     }
   }
 
   function attachEventListeners() {
+    window.addEventListener('message', handleParentMessage);
+
+    if (elements.closeBookButton) {
+      elements.closeBookButton.addEventListener('click', function (event) {
+        const closeEvent = dispatchReaderEvent(
+          'dyslibria-reader:close-requested',
+          createReaderEventDetail('dyslibria-reader:close-requested'),
+          true
+        );
+
+        if (!closeUrl || closeEvent.defaultPrevented) {
+          event.preventDefault();
+        }
+      });
+    }
+
     elements.closeSettings.addEventListener('click', function () {
       closeOverlay();
     });
@@ -1519,9 +2255,7 @@
     });
 
     elements.disableDyslibriaInput.addEventListener('change', function () {
-      settings.disableDyslibria = this.checked;
-      applyReaderSettings();
-      persistSettings();
+      syncDisableDyslibriaSetting(this.checked);
     });
 
     window.addEventListener('resize', function () {
@@ -1529,7 +2263,10 @@
     });
 
     elements.viewerFrame.addEventListener('click', handleShellSurfaceInteraction);
-    elements.viewerFrame.addEventListener('touchend', handleShellSurfaceInteraction, { passive: false });
+    elements.viewerFrame.addEventListener('touchstart', handleShellTouchStart, { passive: true });
+    elements.viewerFrame.addEventListener('touchmove', handleShellTouchMove, { passive: true });
+    elements.viewerFrame.addEventListener('touchend', handleShellTouchEnd, { passive: false });
+    elements.viewerFrame.addEventListener('touchcancel', clearActiveTouchGesture, { passive: true });
 
     window.addEventListener('popstate', function () {
       if (uiState.overlay && uiState.overlayHistoryActive) {
@@ -1539,12 +2276,12 @@
   }
 
   async function initialiseReader() {
-    if (!fileName) {
-      updateMetadata('No EPUB selected', 'Open a book from the dashboard first.');
-      setLoadingState('No EPUB selected', 'Open a book from the dashboard first.');
-      setLoadingProgress(0, 'Open a book from the library first.');
-      elements.chapterLabel.textContent = 'No file parameter was provided.';
-      elements.progressDetail.textContent = 'Open a book from the library first.';
+    if (!epubUrl) {
+      updateMetadata('No EPUB selected', 'Open a book to start reading.');
+      setLoadingState('No EPUB selected', 'Open a book to start reading.');
+      setLoadingProgress(0, 'Open a book to start reading.');
+      elements.chapterLabel.textContent = 'No book is currently loaded.';
+      elements.progressDetail.textContent = 'Open a book to start reading.';
       openOverlay('settings', { pushHistory: false });
       return;
     }
@@ -1555,13 +2292,25 @@
     updateSettingLabels();
     applyShellTheme();
     applyViewerMargins();
+    if (elements.closeBookButton) {
+      if (shouldShowCloseButton) {
+        elements.closeBookButton.href = closeUrl || '#';
+        elements.closeBookButton.hidden = false;
+      } else {
+        elements.closeBookButton.hidden = true;
+      }
+    }
     attachEventListeners();
 
     try {
+      if (initialBookTitle || initialBookAuthor) {
+        updateMetadata(initialBookTitle, initialBookAuthor);
+      }
+
       setLoadingProgress(8, 'Checking saved position');
-      const savedProgressPromise = fetchSavedProgress(fileName);
+      const savedProgressPromise = fetchSavedProgress();
       setLoadingProgress(18, 'Loading EPUB package');
-      const epubBuffer = await fetchEpubBuffer(fileName);
+      const epubBuffer = await fetchEpubBuffer();
       setLoadingProgress(34, 'Preparing browser reader');
       book = ePub(epubBuffer);
       rendition = book.renderTo('viewer', {
@@ -1574,6 +2323,7 @@
       if (rendition.hooks && rendition.hooks.content) {
         rendition.hooks.content.register(function (contents) {
           lockContentSelection(contents);
+          attachContentTouchInteractions(contents);
           applyContentPresentationOverrides(contents);
         });
       }
@@ -1585,7 +2335,6 @@
       });
 
       rendition.on('click', handleSurfaceInteraction);
-      rendition.on('touchend', handleSurfaceInteraction);
 
       setLoadingProgress(48, 'Reading package metadata');
       await book.ready;

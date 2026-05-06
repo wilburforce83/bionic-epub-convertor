@@ -1,13 +1,18 @@
 {
     "name": "epub-processor",
-    "version": "1.2.2",
+    "version": "1.2.3",
     "description": "Self-hosted EPUB processing and library management with bionic text conversion.",
     "main": "server.js",
     "scripts": {
         "start": "node server.js",
-        "test": "node --test test/*.test.js"
+        "test": "node --test test/*.test.js",
+        "sync:reader-assets": "node ./scripts/sync-reader-assets.mjs",
+        "build:reader-shell": "node ./scripts/build-reader-html.mjs",
+        "prepare:reader": "npm run sync:reader-assets && npm run build:reader-shell",
+        "postinstall": "npm run prepare:reader"
     },
     "dependencies": {
+        "@wilburforce83/reader": "^0.1.0",
         "adm-zip": "^0.5.14",
         "cheerio": "^1.1.2",
         "chokidar": "^4.0.3",

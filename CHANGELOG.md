@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.3 - 2026-05-06
+
+### Changed
+
+- integrated the published `@wilburforce83/reader` package into the self-hosted app so the library now uses the same central reader runtime as the standalone sandbox and hosted web app
+- replaced the hand-maintained `authenticated/reader.html` shell with a generated package document while keeping the existing `?file=` self-hosted launch flow, progress routes, and close behavior intact
+- moved packaged reader assets into the release build through install-time sync scripts so Docker and local installs pull the same reader runtime and paper texture bundle automatically
+
 ## 1.1.3 - 2026-05-01
 
 ### Changed
